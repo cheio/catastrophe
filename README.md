@@ -44,12 +44,12 @@ Get roster
 
 Send Message:
 ```javascript
-   XMPP.sendPrivateMessage('juliette@shakesbeer.org','hey bitch u wanna');
+   XMPP.SendPrivateMessage('juliette@shakesbeer.org','hey bitch u wanna');
 ```
 
 
 MUC:
 ```javascript
-   XMPP.joinMuc('garden@conference.the-capulets.org', 'MontagueLoverboy', function(from,body) { alert('message from '+'from: '+body); }) ;
+   XMPP.JoinMuc('garden@conference.the-capulets.org', 'MontagueLoverboy', function(from,body) { alert('message from '+'from: '+body); }) ;
    XMPP.conn.muc.groupchat('garden@conference.the-capulets.org', 'Yo julester u there???');
 ```

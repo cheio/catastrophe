@@ -143,7 +143,7 @@ XMPP =
 					{
 						console.warn("XMPP.roster["+from+"].OnMessage is null")
 					}
-					console.log("OnMessage");
+					console.log(XMPP.OnMessage);
 					if (XMPP.OnMessage!=null)
 					{
 						XMPP.OnMessage(from,fBody);
