@@ -135,7 +135,7 @@ XMPP =
 			
 					}
 					XMPP.roster[from].messages.push(newMessageObject);
-					XMPP.roster[from].OnMessage(fBody);
+					if (XMPP.roster[from] != null) { XMPP.roster[from].OnMessage(fBody); }
 					if (XMPP.OnMessage!=null) { XMPP.OnMessage(from,fBody); }
 				}
 			}
