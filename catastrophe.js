@@ -7,13 +7,14 @@ var mucserver;
 var avatar_of_hash=[];
 var avatar_of_nick=[];
 var hash_of_nick=[];
-boshurl='https://tfor.de:5281/http-bind/';
+
+boshurl='https://conversejs.org/http-bind/';
 //boshurl='https://daumentempler.de.hm:5281/http-bind/';
 //boshurl='https://openim.de/http-bind/';
 
 XMPP = 
 {
-	connStatus: 0,
+	connectionStatus: 0,
 	conn: null,
 	ownJID: null,
 	roster: {},
@@ -56,25 +57,25 @@ XMPP =
 		XMPP.conn.muc.join ( jid, nickname, this.OnMessage, this.OnPresence);
 	},
 
-	joinMuc: function(jid,nickname,NewMessageNotifyFunction)
+	JoinMuc: function(jid,nickname,NewMessageNotifyFunction)
 	{
 		XMPP.mucs[jid]= new XMPP.RoomClient ( jid, nickname, NewMessageNotifyFunction);
 		return XMPP.mucs[jid];
 	},
 
-	init: function()
+	Init: function()
 	{
 		XMPP.conn=new Strophe.Connection(boshurl);
 	},
 
 
-	nowTimemark: function()
+	NowTimemark: function()
 	{
 		d= new Date();
 		return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate()+"T"+d.getHours()+":"+d.getMinutes()+":"+d.getSeconds()+"Z";
 	},
 
-	login: function(jid,pass)
+	Login: function(jid,pass)
 	{
 		XMPP.ownJID=jid;
 		XMPP.conn.connect(jid,pass, this.OnConnectionStatus);
@@ -109,7 +110,7 @@ XMPP =
 
 			case 4:loginError(); console.log("nach"); break;
 		}
-		XMPP.connStatus=nStatus;
+		XMPP.connectionStatus=nStatus;
 		return true;
 	},
 
@@ -124,18 +125,18 @@ XMPP =
 				{
 					from=stanza.attributes["from"].value.match(/^[^\/]*/)[0];
 					fBody=stanza.childNodes[i].innerHTML;
-					XMPP.roster[from].messages.push(
-					{
-						from:stanza.attributes.from.value,
-						fromNick:sentByNick,
+					newMessageObject={
+						from:from,
 						type:stanza.attributes.type.value,
 						to:stanza.to,
 						body:fBody,
 						ownership:'message-other',
-						timestamp:moment()
+						timestamp:new Date().getTime(),
 			
-					});
-					XMPP.roster[from].OnMessage(from,fBody);
+					}
+					XMPP.roster[from].messages.push(newMessageObject);
+					XMPP.roster[from].OnMessage(fBody);
+					if (XMPP.OnMessage!=null) { XMPP.OnMessage(from,fBody); }
 				}
 			}
 		}
@@ -155,6 +156,8 @@ XMPP =
 		return true;
 	},
 
+	OnMessage: null,
+
 	RefreshRoster: function(OnRosterUpdated)
 	{
 		XMPP.conn.roster.get(function()
@@ -167,34 +170,32 @@ XMPP =
 				daContact.messages=[];
 				XMPP.roster[daContact.jid]=daContact;
 			}
-			OnRosterUpdated();
+			OnRosterUpdated(XMPP.roster);
 
 		});
 	},
 
 
-
-
-	getUniqueID: function()
+	GetUniqueID: function()
 	{
 		XMPP.conn.getUniqueId("my:code");
 	},
 
-	sendPrivateMessage: function(to,msg)
+	SendPrivateMessage: function(to,msg)
 	{
-		var imc = $msg({"id":XMPP.getUniqueID(), "to":to, 'type':'chat'}).c("body").t(msg);
+		var imc = $msg({"id":XMPP.GetUniqueID(), "to":to, 'type':'chat'}).c("body").t(msg);
 		XMPP.conn.send( imc.tree());
 	},
 
 
-	changeMucNick: function(nick)
+	ChangeMucNick: function(nick)
 	{
-		var st=$pres({"id":getUniqueID(), "to":mucserver+nick});
+		var st=$pres({"id":GetUniqueID(), "to":mucserver+nick});
 		XMPP.conn.send(st.tree());
 	},
 
 
-	requestVcard: function(from)
+	RequestVcard: function(from)
 	{
 		from=from.replace(/\/.*$/,'');		// remove ressource
 		var req=$iq({"from":from,"type":"get","id":"vc2"}).c("vCard", {"xmlns":"vcard-temp"});
@@ -202,9 +203,9 @@ XMPP =
 		console.log("requesting "+from);
 	},
 
-	changeVcardNick: function(to)
+	ChangeVcardNick: function(to)
 	{
-		var req=$iq({"id":getUniqueID(), "type":"set"}).c("vCard", {"xmlns":"vcard-temp"});
+		var req=$iq({"id":GetUniqueID(), "type":"set"}).c("vCard", {"xmlns":"vcard-temp"});
 		req.c("NICKNAME").t(to);
 		XMPP.conn.send(req.tree());
 		return true;
@@ -212,11 +213,11 @@ XMPP =
 
 
 
-	registerUser: function(user,pass)
+	RegisterUser: function(user,pass)
 	{
 		XMPP.ownJID=user;
 		ownpass=pass;
-		//var reg=$iq({"type":"set","id":getUniqueID()}).c("query", {"xmlns":"jabber:iq:register"});
+		//var reg=$iq({"type":"set","id":GetUniqueID()}).c("query", {"xmlns":"jabber:iq:register"});
 		/*reg.c("username").t(user);
 		reg.c("password").t(pass);*/
 		//console.log(reg.h());

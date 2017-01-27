@@ -16,8 +16,8 @@ Include needed plugins:
 
 Login:
 ```javascript
-   XMPP.init();
-   XMPP.login('romeo@shakesbeer.org','ilovejulialol');
+   XMPP.Init();
+   XMPP.Login('romeo@shakesbeer.org','ilovejulialol');
 ```
 
 When connected:
@@ -30,14 +30,15 @@ When connected:
 
 When message received:
 ```javascript
-  XMPP.roster['juliet@shakesbeer.org']=function(from,body) { alert("OMG SHE DID IT SHE REPLIED!!! She said: "+body); }
+  XMPP.OnMessage=function(from,body) { alert("Message from "+from+": body"); }
+  XMPP.roster['juliet@shakesbeer.org']=function(body) { document.GetElementByID["lastMessage"].innerHTML="received: "+body;  }
 ```
 
 Get roster
 ```javascript
-   XMPP.conn.roster.get(function()
+   XMPP.RefreshRoster(function(roster)
    {
-   	for (contact in XMPP.conn.roster.items) { myRoster.add(XMPP.conn.roster.items[contact]); }
+   	for (jid in roster) { myRoster.add(jid); }
    }
 ```
 
