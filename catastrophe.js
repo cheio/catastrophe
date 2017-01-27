@@ -135,8 +135,23 @@ XMPP =
 			
 					}
 					XMPP.roster[from].messages.push(newMessageObject);
-					if (XMPP.roster[from] != null) { XMPP.roster[from].OnMessage(fBody); }
-					if (XMPP.OnMessage!=null) { XMPP.OnMessage(from,fBody); }
+					if (XMPP.roster[from].OnMessage != null)
+					{
+						XMPP.roster[from].OnMessage(fBody);
+					}
+					else
+					{
+						console.warn("XMPP.roster["+from+"].OnMessage is null")
+					}
+					console.log("OnMessage");
+					if (XMPP.OnMessage!=null)
+					{
+						XMPP.OnMessage(from,fBody);
+					}
+					else
+					{
+						console.warn("XMPP.OnMessage is null")
+					}
 				}
 			}
 		}
