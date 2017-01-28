@@ -39,7 +39,7 @@ XMPP =
 				type:stanza.attributes.type.value,
 				to:stanza.to,
 				body:stanza.children[0].innerHTML,
-				ownership:sentByNick==nickname?'message-mine':'message-other',
+				ownership:sentByNick==(nickname)?'message-mine':'message-other',
 				timestamp:moment()
 			});
 			NewMessageNotifyFunction(newMessage.from, newMessage.body);
@@ -189,6 +189,7 @@ XMPP =
 				daContact.OnMessage=null;
 				daContact.messages=[];
 				daContact.screenName=daContact.jid.match(/^[^@]*/)[0];
+				daContact.temporary=false;
 				XMPP.roster[daContact.jid]=daContact;
 			}
 			OnRosterUpdated(XMPP.roster);
@@ -202,10 +203,25 @@ XMPP =
 		XMPP.conn.getUniqueId("my:code");
 	},
 
-	SendPrivateMessage: function(to,msg)
+	SendPrivateMessage: function(toJID,body)
 	{
-		var imc = $msg({"id":XMPP.GetUniqueID(), "to":to, 'type':'chat'}).c("body").t(msg);
+
+		var imc = $body({"id":XMPP.GetUniqueID(), "toJID":toJID, 'type':'chat'}).c("body").t(body);
 		XMPP.conn.send( imc.tree());
+		if(!toJID in roster)
+		{
+			roster[to]= { jid:toJID, temporary:true, screenName:toJID.match(/^[^@]*/)[0], messages:[] };
+		}
+		newMessageObject={
+			from:from,
+			type:'chat',
+			to:toJID,
+			body:body,
+			ownership:'message-own',
+			timestamp:new Date().getTime(),
+		}
+		roster[toJID].messages.push(newMessageObject);
+
 	},
 
 
