@@ -38,7 +38,7 @@ Get roster
 ```javascript
    XMPP.RefreshRoster(function(roster)
    {
-   	for (jid in roster) { myRoster.add(jid); }
+   	for (jid in roster) { myRoster.add(jid, roster[jid].screenName); }
    }
 ```
 
@@ -50,6 +50,7 @@ Send Message:
 
 MUC:
 ```javascript
-   XMPP.JoinMuc('garden@conference.the-capulets.org', 'MontagueLoverboy', function(from,body) { alert('message from '+'from: '+body); }) ;
-   XMPP.conn.muc.groupchat('garden@conference.the-capulets.org', 'Yo julester u there???');
+   themuc = XMPP.JoinMuc('garden@conference.the-capulets.org', 'MontagueLoverboy', function(from,body) { alert('message from '+'from: '+body); }) ;
+   themuc.SendMessage("hey guys!");
+   XMPP.mucs['garden@conference.the-capulets.org'].SendMessage("soup");
 ```

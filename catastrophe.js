@@ -54,6 +54,11 @@ XMPP =
 			presences.push(stanza);
 			return true;
 		};
+
+		this.SendMessage = function(body)
+		{
+		   XMPP.conn.muc.groupchat('jid', body);
+		};
 		XMPP.conn.muc.join ( jid, nickname, this.OnMessage, this.OnPresence);
 	},
 
@@ -183,6 +188,7 @@ XMPP =
 				var daContact=XMPP.conn.roster.items[contact];
 				daContact.OnMessage=null;
 				daContact.messages=[];
+				daContact.screenName=daContact.jid.match(/^[^@]*/)[0];
 				XMPP.roster[daContact.jid]=daContact;
 			}
 			OnRosterUpdated(XMPP.roster);
