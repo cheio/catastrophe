@@ -1,14 +1,4 @@
-var ownpass;
-var muc;
-var mucname;
-var mucserver;
-
-
-var avatar_of_hash=[];
-var avatar_of_nick=[];
-var hash_of_nick=[];
-
-boshurl='https://conversejs.org/http-bind/';
+//boshurl='https://conversejs.org/http-bind/';
 //boshurl='https://daumentempler.de.hm:5281/http-bind/';
 //boshurl='https://openim.de/http-bind/';
 
@@ -68,7 +58,7 @@ XMPP =
 		return XMPP.mucs[jid];
 	},
 
-	Init: function()
+	Init: function(boshurl)
 	{
 		XMPP.conn=new Strophe.Connection(boshurl);
 	},
@@ -98,10 +88,11 @@ XMPP =
 			case Strophe.Status.CONNFAIL: console.log("No Connection"); break;
 
 			case Strophe.Status.REGISTER:
-				console.log("submitting");
+				// not implemented yet
+				/* console.log("submitting");
 				XMPP.conn.register.fields.username=XMPP.ownJID;
 				XMPP.conn.register.fields.password=ownpass;
-				XMPP.conn.register.submit()
+				XMPP.conn.register.submit()*/
 				break;
 			case Strophe.Status.REGISTERED:
 				console.log("submitting");
@@ -226,8 +217,9 @@ XMPP =
 
 	ChangeMucNick: function(nick)
 	{
-		var st=$pres({"id":GetUniqueID(), "to":mucserver+nick});
-		XMPP.conn.send(st.tree());
+		// not implemented yet
+		// var st=$pres({"id":GetUniqueID(), "to":mucserver+nick});
+		// XMPP.conn.send(st.tree());
 	},
 
 
