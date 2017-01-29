@@ -203,23 +203,25 @@ XMPP =
 		XMPP.conn.getUniqueId("my:code");
 	},
 
-	SendPrivateMessage: function(to,msg)
+	SendPrivateMessage: function(toJID,body)
 	{
-		var imc = $msg({"id":XMPP.GetUniqueID(), "to":to, 'type':'chat'}).c("body").t(msg);
+
+		var imc = $body({"id":XMPP.GetUniqueID(), "toJID":toJID, 'type':'chat'}).c("body").t(body);
 		XMPP.conn.send( imc.tree());
-		if(!to in XMPP.roster)
+		if(!toJID in roster)
 		{
-			XMPP.roster[to]= { jid:to, temporary:true, screenName:to.match(/^[^@]*/)[0], messages:[] };
+			roster[to]= { jid:toJID, temporary:true, screenName:toJID.match(/^[^@]*/)[0], messages:[] };
 		}
 		newMessageObject={
-			from:XMPP.ownJID,
+			from:from,
 			type:'chat',
-			to:to,
-			body:msg,
+			to:toJID,
+			body:body,
 			ownership:'message-own',
 			timestamp:new Date().getTime(),
 		}
-		XMPP.roster[to].messages.push(newMessageObject);
+		roster[toJID].messages.push(newMessageObject);
+
 	},
 
 
