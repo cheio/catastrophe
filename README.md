@@ -16,7 +16,7 @@ Include needed plugins:
 
 Login:
 ```javascript
-   XMPP.Init();
+   XMPP.Init('https://openim.de/http-bind/');
    XMPP.Login('romeo@shakesbeer.org','ilovejulialol');
 ```
 
