@@ -93,7 +93,7 @@ XMPP =
 		switch(nStatus)
 		{
 			case Strophe.Status.CONNECTING: console.log("Connecting"); break;
-			case Strophe.Status.DISCONNECTING: OnDisconnectedUser(); console.log("kbye"); break;
+			case Strophe.Status.DISCONNECTING: if (XMPP.OnDisconnect != null) XMPP.OnDisconnect(); break;
 			case Strophe.Status.CONNECTED: console.log("Connected"); XMPP.OnConnected(); break;
 			case Strophe.Status.CONNFAIL: console.log("No Connection"); break;
 
@@ -177,6 +177,7 @@ XMPP =
 	},
 
 	OnMessage: null,
+	OnDisconnect: null,
 
 	RefreshRoster: function(OnRosterUpdated)
 	{
