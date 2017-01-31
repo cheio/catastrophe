@@ -16,7 +16,7 @@ Include needed plugins:
 
 Login:
 ```javascript
-   XMPP.Init();
+   XMPP.Init('https://openim.de/http-bind/');
    XMPP.Login('romeo@shakesbeer.org','ilovejulialol');
 ```
 
@@ -33,6 +33,7 @@ When message received:
   XMPP.OnMessage=function(from,body) { alert("Message from "+from+": body"); }
   XMPP.roster['juliet@shakesbeer.org']=function(body) { document.GetElementByID["lastMessage"].innerHTML="received: "+body;  }
 ```
+Also try: XMPP.OnDisconnect
 
 Get roster
 ```javascript
@@ -54,3 +55,4 @@ MUC:
    themuc.SendMessage("hey guys!");
    XMPP.mucs['garden@conference.the-capulets.org'].SendMessage("soup");
 ```
+

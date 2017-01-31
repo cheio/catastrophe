@@ -1,14 +1,4 @@
-var ownpass;
-var muc;
-var mucname;
-var mucserver;
-
-
-var avatar_of_hash=[];
-var avatar_of_nick=[];
-var hash_of_nick=[];
-
-boshurl='https://conversejs.org/http-bind/';
+//boshurl='https://conversejs.org/http-bind/';
 //boshurl='https://daumentempler.de.hm:5281/http-bind/';
 //boshurl='https://openim.de/http-bind/';
 
@@ -68,7 +58,7 @@ XMPP =
 		return XMPP.mucs[jid];
 	},
 
-	Init: function()
+	Init: function(boshurl)
 	{
 		XMPP.conn=new Strophe.Connection(boshurl);
 	},
@@ -93,15 +83,16 @@ XMPP =
 		switch(nStatus)
 		{
 			case Strophe.Status.CONNECTING: console.log("Connecting"); break;
-			case Strophe.Status.DISCONNECTING: OnDisconnectedUser(); console.log("kbye"); break;
+			case Strophe.Status.DISCONNECTING: if (XMPP.OnDisconnect != null) XMPP.OnDisconnect(); break;
 			case Strophe.Status.CONNECTED: console.log("Connected"); XMPP.OnConnected(); break;
 			case Strophe.Status.CONNFAIL: console.log("No Connection"); break;
 
 			case Strophe.Status.REGISTER:
-				console.log("submitting");
+				// not implemented yet
+				/* console.log("submitting");
 				XMPP.conn.register.fields.username=XMPP.ownJID;
 				XMPP.conn.register.fields.password=ownpass;
-				XMPP.conn.register.submit()
+				XMPP.conn.register.submit()*/
 				break;
 			case Strophe.Status.REGISTERED:
 				console.log("submitting");
@@ -177,6 +168,7 @@ XMPP =
 	},
 
 	OnMessage: null,
+	OnDisconnect: null,
 
 	RefreshRoster: function(OnRosterUpdated)
 	{
@@ -225,8 +217,9 @@ XMPP =
 
 	ChangeMucNick: function(nick)
 	{
-		var st=$pres({"id":GetUniqueID(), "to":mucserver+nick});
-		XMPP.conn.send(st.tree());
+		// not implemented yet
+		// var st=$pres({"id":GetUniqueID(), "to":mucserver+nick});
+		// XMPP.conn.send(st.tree());
 	},
 
 
@@ -248,7 +241,7 @@ XMPP =
 
 
 
-	RegisterUser: function(user,pass)
+	RegisterUser: function(user,pass,server)
 	{
 		XMPP.ownJID=user;
 		ownpass=pass;
@@ -256,7 +249,7 @@ XMPP =
 		/*reg.c("username").t(user);
 		reg.c("password").t(pass);*/
 		//console.log(reg.h());
-		XMPP.conn.register.connect("daumentempler.de.hm",OnConnectionStatus,60,1);
+		XMPP.conn.register.connect(server,OnConnectionStatus,60,1);
 	},
 
 
@@ -271,3 +264,4 @@ XMPP =
 		return true;
 	},
 }
+
