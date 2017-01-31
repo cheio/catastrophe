@@ -241,7 +241,7 @@ XMPP =
 
 
 
-	RegisterUser: function(user,pass)
+	RegisterUser: function(user,pass,server)
 	{
 		XMPP.ownJID=user;
 		ownpass=pass;
@@ -249,7 +249,7 @@ XMPP =
 		/*reg.c("username").t(user);
 		reg.c("password").t(pass);*/
 		//console.log(reg.h());
-		XMPP.conn.register.connect("daumentempler.de.hm",OnConnectionStatus,60,1);
+		XMPP.conn.register.connect(server,OnConnectionStatus,60,1);
 	},
 
 
@@ -264,3 +264,4 @@ XMPP =
 		return true;
 	},
 }
+

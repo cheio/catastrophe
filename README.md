@@ -55,3 +55,4 @@ MUC:
    themuc.SendMessage("hey guys!");
    XMPP.mucs['garden@conference.the-capulets.org'].SendMessage("soup");
 ```
+

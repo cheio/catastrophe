@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+	<head>
+
+		<!-- meta stuff -->
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+		<title>Catastrophentest</title>
+
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+
+		<!-- import catastrophe & strophejs -->
+		<script src="lib/strophejs/strophe.min.js"></script>
+		<script src="lib/strophejs/strophe.roster.js"></script>
+		<script src="lib/strophejs/strophe.muc.js"></script>
+		<script src="catastrophe.js"></script>
+
+	</head>
+
+	<body>
+		
+		<h1>Catastrophentest</h1>
+
+		<!-- Test the bosh connection -->
+		<p>Bosh-url:</p>
+		<input id="boshurl" value="http://janian.de:5280/http-bind/">
+		<button id="xmppinit">Go!</button>
+
+		<hr>
+
+		<!-- Test the login -->
+		<p>Sign in:</p>
+		<input id="loginJID" value="catastrophentester@janian.de" placeholder="Jabber-ID">
+		<input id="loginPass" value="catastrophentester1234" placeholder="Password">
+		<button id="xmpplogin">Go!</button>
+
+		<hr>
+
+
+		<!-- Test registration -->
+		<p>Sign up:</p>
+		<input id="registerName" placeholder="Username">
+		<input id="registerServer" placeholder="Server">
+		<input id="registerPass" placeholder="Password">
+		<button id="xmppregisteruser">Go!</button>
+
+		<hr>
+
+
+		<!-- Test sending messages -->
+		<p>Send Message:</p>
+		<input id="sendJID" placeholder="Jabber-ID">
+		<input id="sendMessage" placeholder="Your message ...">
+		<button id="xmppsendmessage">Go!</button>
+
+		<hr>
+
+
+		<!-- Test Request Roster -->
+		<p>Request Roster:</p>
+		<button id="xmpprefreshroster">Go!</button>
+		<div id="requestRoster"></div>
+
+		<hr>
+
+
+		<!-- Test Request Roster -->
+		<p>Request the whole XMPP object:</p>
+		<button id="xmppObject">Go!</button>
+
+		<hr>
+
+
+		<!-- Test joining MUC -->
+		<p>Join Muc:</p>
+		<input id="joinMucID" value="catastrophentest@conference.janian.de" placeholder="MUC-ID">
+		<button id="xmppjoinmuc">Go!</button>
+
+		<hr>
+
+
+		<!-- Test sending message to MUC -->
+		<p>Send Message to MUC:</p>
+		<select id="sendMucID">
+
+    	</select>
+		<input id="sendMucMessage" placeholder="Your message ...">
+		<button id="xmppmucsendmessage">Go!</button>
+
+
+		<!-- Catatrophe implementation -->
+		<script language="javascript" type="text/javascript">
+			var mucList = [];
+
+			$("#xmppinit").click(function(){
+				console.log("Try to connect to bosh service!");
+				bosh = $("#boshurl").val();
+				XMPP.Init(bosh);
+			});
+
+			$("#xmpplogin").click(function(){
+				console.log("Try to login ...");
+				jid = $("#loginJID").val();
+				pass = $("#loginPass").val();
+				XMPP.Login(jid,pass);
+			});
+
+			$("#xmppregister").click(function(){
+				console.log("Try to register ...");
+				name = $("#registerName").val();
+				server = $("#registerServer").val();
+				pass = $("#registerPass").val();
+				XMPP.RegisterUser(name,pass,server);
+			});
+
+			$("#xmppsendmessage").click(function(){
+				console.log("Try to send message ...");
+				jid = $("#sendJID").val();
+				message = $("#sendMessage").val();
+				XMPP.SendPrivateMessage(jid,message);
+			});
+
+			$("#xmpprefreshroster").click(function(){
+				XMPP.RefreshRoster(function(roster){
+					console.log(roster);
+					var html = "<ul>";
+					for (jid in roster)  html = html + "<li>" + roster[jid].screenName + "</li>";
+					$("#requestRoster").html(html);
+				});
+			});
+
+			$("#xmppObject").click(function(){
+				console.log(XMPP);
+			});
+
+			$("#xmppjoinmuc").click(function(){
+				console.log("Try to join muc ...");
+				jid = $("#joinMucID").val();
+				mucList[jid] =  XMPP.JoinMuc(jid, jid, function(from,body) {
+					alert('MUC: ' + jid + ' - message from '+ from + ': ' + body);
+					console.log('MUC: ' + jid + ' - message from '+ from + ': ' + body);
+					});
+				html = $("#sendMucID").html();
+				html = html + '<option value="' + jid + '">' + jid + '</option>';
+				$("#sendMucID").html(html);
+			});
+
+			$("#xmppmucsendmessage").click(function(){
+				console.log("Try to send muc-message ...");
+				jid = $("#sendMucID").val();
+				message = $("#sendMucMessage").val();
+				mucList[jid].SendMessage(message);
+			});
+
+
+			XMPP.OnCustomConnected=function(){
+				XMPP.RefreshRoster(function(roster){
+					XMPP.OnMessage=function(from,body) {
+						alert("Message from " + from + ": " + body);
+						console("Message from " + from + ": " + body);
+					}
+				console.log("Login succesfull!");
+				alert("Login succesfull!");
+				});
+			}
+
+
+		</script> 
+
+	</body>
+
+</html>
+
