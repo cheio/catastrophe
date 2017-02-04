@@ -8,19 +8,20 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 		<title>Catastrophentest</title>
 
-		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+		<script src="./jquery.js"></script>
 
 		<!-- import catastrophe & strophejs -->
-		<script src="lib/strophejs/strophe.min.js"></script>
-		<script src="lib/strophejs/strophe.roster.js"></script>
-		<script src="lib/strophejs/strophe.muc.js"></script>
-		<script src="catastrophe.js"></script>
+		<script src="../lib/strophejs/strophe.min.js"></script>
+		<script src="../lib/strophejs/strophe.register.js"></script>
+		<script src="../lib/strophejs/strophe.roster.js"></script>
+		<script src="../lib/strophejs/strophe.muc.js"></script>
+		<script src="../catastrophe.js"></script>
 
 	</head>
 
 	<body>
 		
-		<h1>Catastrophentest</h1>
+		<h1>Catastrophentescht</h1>
 
 		<!-- Test the bosh connection -->
 		<p>Bosh-url:</p>
@@ -43,7 +44,7 @@
 		<input id="registerName" placeholder="Username">
 		<input id="registerServer" placeholder="Server">
 		<input id="registerPass" placeholder="Password">
-		<button id="xmppregisteruser">Go!</button>
+		<button id="xmppregister">Go!</button>
 
 		<hr>
 
@@ -94,28 +95,36 @@
 			var mucList = [];
 
 			$("#xmppinit").click(function(){
-				console.log("Try to connect to bosh service!");
+				console.log("Trying to connect to bosh service!");
 				bosh = $("#boshurl").val();
 				XMPP.Init(bosh);
 			});
 
 			$("#xmpplogin").click(function(){
-				console.log("Try to login ...");
+				console.log("Trying to login ...");
 				jid = $("#loginJID").val();
 				pass = $("#loginPass").val();
 				XMPP.Login(jid,pass);
 			});
 
 			$("#xmppregister").click(function(){
-				console.log("Try to register ...");
+				console.log("Trying to register ...");
 				name = $("#registerName").val();
 				server = $("#registerServer").val();
 				pass = $("#registerPass").val();
-				XMPP.RegisterUser(name,pass,server);
+				XMPP.RegisterUser(name,pass,server,function(result){
+					switch(result) {
+						case 'ok': alert("Hat geklappt!");break;
+						case 'conflict': alert("Benutzer gibt es schon");break;
+						case 'not acceptable': alert("Ich brauche einen Benutzernamen und ein Paßwort.");break;
+						case 'regifail': alert("Server unterstützt keine Registrierung.");break;
+						case '?': alert("Ich glaube, StropheJS macht hier was falsch.");break;
+					}
+				});
 			});
 
 			$("#xmppsendmessage").click(function(){
-				console.log("Try to send message ...");
+				console.log("Trying to send message ...");
 				jid = $("#sendJID").val();
 				message = $("#sendMessage").val();
 				XMPP.SendPrivateMessage(jid,message);
@@ -135,7 +144,7 @@
 			});
 
 			$("#xmppjoinmuc").click(function(){
-				console.log("Try to join muc ...");
+				console.log("Trying to join muc ...");
 				jid = $("#joinMucID").val();
 				mucList[jid] =  XMPP.JoinMuc(jid, jid, function(from,body) {
 					alert('MUC: ' + jid + ' - message from '+ from + ': ' + body);
@@ -147,7 +156,7 @@
 			});
 
 			$("#xmppmucsendmessage").click(function(){
-				console.log("Try to send muc-message ...");
+				console.log("Trying to send muc-message ...");
 				jid = $("#sendMucID").val();
 				message = $("#sendMucMessage").val();
 				mucList[jid].SendMessage(message);

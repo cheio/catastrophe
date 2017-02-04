@@ -14,6 +14,17 @@ Include needed plugins:
    <script src='lib/strophejs-plugins/strophe.muc.js'></script>
 ```
 
+Register:
+```javascript
+   XMPP.RegisterUser(name,pass,server,function(result){
+   switch(result)
+   {
+      case 'ok': alert("It worked");break;
+      case 'conflict': alert("Username is taken");break;
+      case 'not acceptable': alert("Invalid username or password");break;
+      case 'regifail': alert("Registration disabled");break;
+   }
+   })
 Login:
 ```javascript
    XMPP.Init('https://openim.de/http-bind/');

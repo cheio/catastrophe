@@ -185,7 +185,6 @@ XMPP =
 				XMPP.roster[daContact.jid]=daContact;
 			}
 			OnRosterUpdated(XMPP.roster);
-
 		});
 	},
 
@@ -241,15 +240,48 @@ XMPP =
 
 
 
-	RegisterUser: function(user,pass,server)
+	RegisterUser: function(user,password,server,callback)
 	{
-		XMPP.ownJID=user;
-		ownpass=pass;
+		//XMPP.ownJID=user;
+		//ownpass=pass;
 		//var reg=$iq({"type":"set","id":GetUniqueID()}).c("query", {"xmlns":"jabber:iq:register"});
 		/*reg.c("username").t(user);
 		reg.c("password").t(pass);*/
 		//console.log(reg.h());
-		XMPP.conn.register.connect(server,OnConnectionStatus,60,1);
+
+		registerCallback=function(status)
+		{
+			console.log(server);
+			console.log("habib"+status);
+			if ( status==Strophe.Status.REGISTER )
+			{
+				XMPP.conn.register.fields.username = user;
+				XMPP.conn.register.fields.password = password;
+				XMPP.conn.register.submit();
+			}
+			else if ( status==Strophe.Status.REGISTERED )
+			{
+				callback('ok');
+			}
+			else if ( status==Strophe.Status.CONFLICT )
+			{
+				callback('conflict');
+			}
+			else if ( status==Strophe.Status.NOTACCEPTABLE )
+			{
+				callback('not acceptable');
+			}
+			else if ( status==Strophe.Status.REGIFAIL )
+			{
+				callback('regifail');
+			}
+			else if ( status==Strophe.Status.CONNECTED )
+			{
+			}
+			else
+				callback('?');
+		}
+		XMPP.conn.register.connect(server,registerCallback,60,1);
 	},
 
 
