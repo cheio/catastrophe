@@ -55,7 +55,7 @@ XMPP =
 			res = XMPP.conn.muc.invite(roomJid,userJid,message);
 			console.log(res);
 		}
-		XMPP.conn.muc.join ( jid, nickname, this.OnMessage, this.OnPresence);
+		XMPP.conn.muc.join ( roomJid, nickname, this.OnMessage, this.OnPresence);
 	},
 
 	JoinMuc: function(jid,nickname,NewMessageNotifyFunction)
@@ -265,8 +265,6 @@ XMPP =
 	{
 		registerCallback=function(status)
 		{
-			console.log(server);
-			console.log("habib"+status);
 			if ( status==Strophe.Status.REGISTER )
 			{
 				XMPP.conn.register.fields.username = user;
