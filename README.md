@@ -25,6 +25,8 @@ Register:
       case 'regifail': alert("Registration disabled");break;
    }
    })
+```
+
 Login:
 ```javascript
    XMPP.Init('https://openim.de/http-bind/');
