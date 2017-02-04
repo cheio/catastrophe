@@ -65,5 +65,6 @@ MUC:
    themuc = XMPP.JoinMuc('garden@conference.the-capulets.org', 'MontagueLoverboy', function(from,body) { alert('message from '+'from: '+body); }) ;
    themuc.SendMessage("hey guys!");
    XMPP.mucs['garden@conference.the-capulets.org'].SendMessage("soup");
+   XMPP.mucs['garden@conference.the-capulets.org'].InviteUser("jooliet@shakespear.lit", "get ur ass here");
 ```
 

@@ -10,7 +10,7 @@ XMPP =
 	roster: {},
 	mucs:{},
 	OnCustomConnected:null,
-	RoomClient: function(jid, nickname, NewMessageNotifyFunction)
+	RoomClient: function(roomJid, nickname, NewMessageNotifyFunction)
 	{
 		this.messages=[];
 		messages=this.messages;
@@ -45,10 +45,16 @@ XMPP =
 			return true;
 		};
 
-		this.SendMessage = function(body)
+		this.SendMessage = function(body) { XMPP.conn.muc.groupchat(roomJid, body); };
+
+		this.InviteUser = function(userJid,message)
 		{
-		   XMPP.conn.muc.groupchat('jid', body);
-		};
+			console.log(roomJid);
+			console.log(userJid);
+			console.log(message);
+			res = XMPP.conn.muc.invite(roomJid,userJid,message);
+			console.log(res);
+		}
 		XMPP.conn.muc.join ( jid, nickname, this.OnMessage, this.OnPresence);
 	},
 
@@ -188,15 +194,30 @@ XMPP =
 		});
 	},
 
+	AddToRoster: function(jid,message)
+	{
+		XMPP.conn.roster.subscribe(jid,message);
+		XMPP.conn.roster.authorize(jid,message,"");
+		XMPP.conn.roster.add(jid,message,"",function(what){console.log(what);});
+	},
+	RemoveFromRoster: function(jid)
+	{
+		XMPP.conn.roster.unsubscribe(jid, "");
+		XMPP.conn.roster.unauthorize(jid, "");
+		XMPP.conn.roster.remove(jid);
+		XMPP.conn.roster.removeItem(jid);
+	},
+	AuthorizeRequest: function(jid) {XMPP.conn.roster.authorize(jid,"");},
+
 
 	GetUniqueID: function()
 	{
 		XMPP.conn.getUniqueId("my:code");
 	},
 
-	SendPrivateMessage: function(to,msg)
+	SendPrivateMessage: function(to,message)
 	{
-		var imc = $msg({"id":XMPP.GetUniqueID(), "to":to, 'type':'chat'}).c("body").t(msg);
+		var imc = $msg({"id":XMPP.GetUniqueID(), "to":to, 'type':'chat'}).c("body").t(message);
 		XMPP.conn.send( imc.tree());
 		if(!to in XMPP.roster)
 		{
@@ -206,7 +227,7 @@ XMPP =
 			from:XMPP.ownJID,
 			type:'chat',
 			to:to,
-			body:msg,
+			body:message,
 			ownership:'message-own',
 			timestamp:new Date().getTime(),
 		}
@@ -242,13 +263,6 @@ XMPP =
 
 	RegisterUser: function(user,password,server,callback)
 	{
-		//XMPP.ownJID=user;
-		//ownpass=pass;
-		//var reg=$iq({"type":"set","id":GetUniqueID()}).c("query", {"xmlns":"jabber:iq:register"});
-		/*reg.c("username").t(user);
-		reg.c("password").t(pass);*/
-		//console.log(reg.h());
-
 		registerCallback=function(status)
 		{
 			console.log(server);
