@@ -165,6 +165,7 @@ XMPP =
 		// XMPP.conn.addHandler(OnPresenceStanza, null, "presence");
 		XMPP.conn.addHandler(XMPP.OnMessageStanza, null, "message",null,null,null);
 		// XMPP.conn.addHandler(XMPP.OnIqStanza, null, "iq");
+		XMPP.conn.addHandler(XMPP.OnSubscriptionRequest, null, "presence", "subscribe");
 		XMPP.conn.send($pres().tree());
 		if (XMPP.OnCustomConnected!=null)
 		{
@@ -307,5 +308,25 @@ XMPP =
 		}
 		return true;
 	},
+
+	OnSubRequest: null,
+
+	OnSubscriptionRequest: function(stanza)
+	{	
+		var from = stanza.getAttribute("from");
+		console.log("Subscription-request from " + from);
+		if(stanza.getAttribute("type") == "subscribe" && from in XMPP.roster)
+		{
+		    // Send a 'subscribed' notification back to accept the incoming
+		    // subscription request
+		    XMPP.conn.send($pres({ to: from, type: "subscribed" }));
+		}
+		if (XMPP.OnSubRequest!=null)
+		{
+			XMPP.OnSubRequest(from);
+		}
+		return true;
+	}
+
 }
 
