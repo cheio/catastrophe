@@ -14,6 +14,7 @@ XMPP =
 	{
 		this.messages=[];
 		messages=this.messages;
+		this.NewMessageNotifyFunction = NewMessageNotifyFunction;
 		this.nickname=nickname;
 		var presences = [];
 
@@ -22,20 +23,24 @@ XMPP =
 
 		this.OnMessage = function(stanza, room)
 		{
-			sentByNick=stanza.attributes.from.value.match(/[^\/]*$/)[0];
-			newMessage=({
-				from:stanza.attributes.from.value,
-				fromNick:sentByNick,
-				type:stanza.attributes.type.value,
-				to:stanza.to,
-				body:stanza.children[0].innerHTML,
-				ownership:sentByNick==(nickname)?'message-mine':'message-other',
-				timestamp:moment()
-			});
-			NewMessageNotifyFunction(newMessage.from, newMessage.body);
-			this.messages.push(newMessage);
-			
-			// $scope.updateLastText(newMessage.from.nodeValue.match(/^[^\/]*/)[0],newMessage,$scope);
+			if (stanza.getElementsByTagName("body").length != 0)
+			{
+				if(stanza.getElementsByTagName("delay").length != 0) time = stanza.getElementsByTagName("delay")[0].attributes.stamp.value;
+				else time = new Date();
+				sentByNick=stanza.attributes.from.value.match(/[^\/]*$/)[0];
+				newMessage={
+					from:stanza.attributes.from.value,
+					fromNick:sentByNick,
+					type:stanza.attributes.type.value,
+					to:stanza.to,
+					body:stanza.children[0].innerHTML,
+					ownership:sentByNick==(nickname)?'message-mine':'message-other',
+					timestamp: time
+					//
+				}
+				XMPP.mucs[roomJid].messages.push(newMessage);
+				XMPP.mucs[roomJid].NewMessageNotifyFunction(newMessage.from, newMessage.body);
+			}
 			return true;
 		};
 
@@ -45,7 +50,20 @@ XMPP =
 			return true;
 		};
 
-		this.SendMessage = function(body) { XMPP.conn.muc.groupchat(roomJid, body); };
+		this.SendMessage = function(body)
+		{
+			XMPP.conn.muc.groupchat(roomJid, body);
+			newMessage={
+				from: roomJid + "/" + this.nickname,
+				fromNick:this.nickname,
+				type:"groupchat",
+				to:roomJid,
+				body:body,
+				ownership:'message-mine',
+				timestamp:new Date().getTime()
+			}
+			XMPP.mucs[roomJid].messages.push(newMessage);
+		};
 
 		this.InviteUser = function(userJid,message)
 		{
@@ -137,6 +155,7 @@ XMPP =
 			
 					}
 					XMPP.roster[from].messages.push(newMessageObject);
+					
 					if (XMPP.roster[from].OnMessage != null)
 					{
 						XMPP.roster[from].OnMessage(fBody);
@@ -333,4 +352,5 @@ XMPP =
 	}
 
 }
+
 
