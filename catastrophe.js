@@ -55,7 +55,7 @@ XMPP =
 			res = XMPP.conn.muc.invite(roomJid,userJid,message);
 			console.log(res);
 		}
-		XMPP.conn.muc.join ( jid, nickname, this.OnMessage, this.OnPresence);
+		XMPP.conn.muc.join ( roomJid, nickname, this.OnMessage, this.OnPresence);
 	},
 
 	JoinMuc: function(jid,nickname,NewMessageNotifyFunction)
@@ -165,6 +165,7 @@ XMPP =
 		// XMPP.conn.addHandler(OnPresenceStanza, null, "presence");
 		XMPP.conn.addHandler(XMPP.OnMessageStanza, null, "message",null,null,null);
 		// XMPP.conn.addHandler(XMPP.OnIqStanza, null, "iq");
+		XMPP.conn.addHandler(XMPP.OnSubscriptionRequest, null, "presence", "subscribe");
 		XMPP.conn.send($pres().tree());
 		if (XMPP.OnCustomConnected!=null)
 		{
@@ -265,8 +266,6 @@ XMPP =
 	{
 		registerCallback=function(status)
 		{
-			console.log(server);
-			console.log("habib"+status);
 			if ( status==Strophe.Status.REGISTER )
 			{
 				XMPP.conn.register.fields.username = user;
@@ -309,5 +308,29 @@ XMPP =
 		}
 		return true;
 	},
+
+	OnSubRequest: null,
+
+	OnSubRequestAccepted: null,
+
+	OnSubscriptionRequest: function(stanza)
+	{	
+		var from = stanza.getAttribute("from");
+		console.log("Subscription-request from " + from);
+		if(from in XMPP.roster)
+		{
+		    // Send a 'subscribed' notification back to accept the incoming
+		    // subscription request
+		    XMPP.conn.send($pres({ to: from, type: "subscribed" }));
+		    if (XMPP.OnSubRequestAccepted!=null) XMPP.OnSubRequestAccepted(from);
+		}
+        else
+        {
+		    if (XMPP.OnSubRequest!=null) XMPP.OnSubRequest(from);
+        }
+
+		return true;
+	}
+
 }
 
