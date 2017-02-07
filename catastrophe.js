@@ -330,23 +330,28 @@ XMPP =
 
 	OnSubRequest: null,
 
+
 	OnSubRequestAccepted: null,
 
 	OnSubscriptionRequest: function(stanza)
 	{	
 		var from = stanza.getAttribute("from");
 		console.log("Subscription-request from " + from);
-		if(from in XMPP.roster)
+
+		if(stanza.getAttribute("type") == "subscribe" && from in XMPP.roster)
+
 		{
 		    // Send a 'subscribed' notification back to accept the incoming
 		    // subscription request
 		    XMPP.conn.send($pres({ to: from, type: "subscribed" }));
+
 		    if (XMPP.OnSubRequestAccepted!=null) XMPP.OnSubRequestAccepted(from);
 		}
-        else
-        {
+    else
+    {
 		    if (XMPP.OnSubRequest!=null) XMPP.OnSubRequest(from);
-        }
+    }
+
 
 		return true;
 	}
