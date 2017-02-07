@@ -56,6 +56,21 @@ Get roster
    }
 ```
 
+Add contact to roster
+```javascript
+   XMPP.AddToRoster('juliette@shakesbeer.org','juliette');
+```
+
+Remove contact from roster
+```javascript
+   XMPP.RemoveFromRoster('juliette@shakesbeer.org');
+```
+On new friendship-requests or accepted request
+```javascript
+   XMPP.OnSubRequest = function(jid){ alert(jid + ' wants to be your friend!'); }
+   XMPP.OnSubRequestAccepted = function(jid){ alert(jid + ' has accepted your friendship-request!'); }
+```	
+
 Send Message:
 ```javascript
    XMPP.SendPrivateMessage('juliette@shakesbeer.org','hey bitch u wanna');
