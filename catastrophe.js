@@ -25,7 +25,7 @@ XMPP =
 		{
 			if (stanza.getElementsByTagName("body").length != 0)
 			{
-				if(stanza.getElementsByTagName("delay").length != 0) time = stanza.getElementsByTagName("delay")[0].attributes.stamp.value;
+				if(stanza.getElementsByTagName("delay").length != 0) time = new Date(stanza.getElementsByTagName("delay")[0].attributes.stamp.value);
 				else time = new Date();
 				sentByNick=stanza.attributes.from.value.match(/[^\/]*$/)[0];
 				newMessage={
@@ -34,9 +34,8 @@ XMPP =
 					type:stanza.attributes.type.value,
 					to:stanza.to,
 					body:stanza.children[0].innerHTML,
-					ownership:sentByNick==(nickname)?'message-mine':'message-other',
-					timestamp: time
-					//
+					ownership:sentByNick==(XMPP.mucs[roomJid].nickname)?'message-own':'message-other',
+					timestamp:time.getTime(),
 				}
 				XMPP.mucs[roomJid].messages.push(newMessage);
 				XMPP.mucs[roomJid].NewMessageNotifyFunction(newMessage.from, newMessage.body);
@@ -53,16 +52,6 @@ XMPP =
 		this.SendMessage = function(body)
 		{
 			XMPP.conn.muc.groupchat(roomJid, body);
-			newMessage={
-				from: roomJid + "/" + this.nickname,
-				fromNick:this.nickname,
-				type:"groupchat",
-				to:roomJid,
-				body:body,
-				ownership:'message-mine',
-				timestamp:new Date().getTime()
-			}
-			XMPP.mucs[roomJid].messages.push(newMessage);
 		};
 
 		this.InviteUser = function(userJid,message)
@@ -136,7 +125,7 @@ XMPP =
 
 	OnIqStanza: function(stanza) { console.log(stanza); },
 	OnMessageStanza: function(stanza)
-	{
+	{	
 		if (stanza.attributes.type.value=="chat")
 		{
 			for (i=0; i<stanza.childNodes.length; i++)
@@ -154,8 +143,11 @@ XMPP =
 						timestamp:new Date().getTime(),
 			
 					}
+					if(!(from in XMPP.roster))
+					{
+						XMPP.roster[from] = {messages: []};
+					}			
 					XMPP.roster[from].messages.push(newMessageObject);
-					
 					if (XMPP.roster[from].OnMessage != null)
 					{
 						XMPP.roster[from].OnMessage(fBody);
@@ -217,7 +209,7 @@ XMPP =
 	AddToRoster: function(jid,message)
 	{
 		XMPP.conn.roster.subscribe(jid,message);
-		XMPP.conn.roster.authorize(jid,message,"");
+		XMPP.conn.roster.authorize(jid,"");
 		XMPP.conn.roster.add(jid,message,"",function(what){console.log(what);});
 	},
 	RemoveFromRoster: function(jid)
@@ -330,32 +322,36 @@ XMPP =
 
 	OnSubRequest: null,
 
-
 	OnSubRequestAccepted: null,
 
 	OnSubscriptionRequest: function(stanza)
 	{	
 		var from = stanza.getAttribute("from");
 		console.log("Subscription-request from " + from);
-
-		if(stanza.getAttribute("type") == "subscribe" && from in XMPP.roster)
-
+		if(from in XMPP.roster)
 		{
 		    // Send a 'subscribed' notification back to accept the incoming
 		    // subscription request
 		    XMPP.conn.send($pres({ to: from, type: "subscribed" }));
-
+			XMPP.AuthorizeRequest(from);
 		    if (XMPP.OnSubRequestAccepted!=null) XMPP.OnSubRequestAccepted(from);
 		}
-    else
-    {
+        else
+        {
 		    if (XMPP.OnSubRequest!=null) XMPP.OnSubRequest(from);
-    }
-
+        }
 
 		return true;
+	},
+
+	logout: function(){
+		XMPP.conn.options.sync = true; // Switch to using synchronous requests since this is typically called onUnload.
+		XMPP.conn.flush();
+		XMPP.conn.disconnect();
+		XMPP.conn = null;
+		XMPP.ownJID = null;
+		XMPP.roster = {};
+		XMPP.mucs = {};
 	}
 
 }
-
-
