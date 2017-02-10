@@ -342,6 +342,12 @@ XMPP =
         }
 
 		return true;
+	},
+
+	logout: function(){
+		XMPP.conn.options.sync = true; // Switch to using synchronous requests since this is typically called onUnload.
+		XMPP.conn.flush();
+		XMPP.conn.disconnect();
 	}
 
 }
