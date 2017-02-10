@@ -25,7 +25,7 @@ XMPP =
 		{
 			if (stanza.getElementsByTagName("body").length != 0)
 			{
-				if(stanza.getElementsByTagName("delay").length != 0) time = stanza.getElementsByTagName("delay")[0].attributes.stamp.value;
+				if(stanza.getElementsByTagName("delay").length != 0) time = new Date(stanza.getElementsByTagName("delay")[0].attributes.stamp.value);
 				else time = new Date();
 				sentByNick=stanza.attributes.from.value.match(/[^\/]*$/)[0];
 				newMessage={
@@ -34,8 +34,9 @@ XMPP =
 					type:stanza.attributes.type.value,
 					to:stanza.to,
 					body:stanza.children[0].innerHTML,
-					ownership:sentByNick==(nickname)?'message-mine':'message-other',
-					timestamp: time
+					ownership:sentByNick==(nickname)?'message-own':'message-other',
+					timestamp:time.getTime(),
+
 				}
 				XMPP.mucs[roomJid].messages.push(newMessage);
 				XMPP.mucs[roomJid].NewMessageNotifyFunction(newMessage.from, newMessage.body);
