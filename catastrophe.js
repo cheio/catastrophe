@@ -36,6 +36,7 @@ XMPP =
 					body:stanza.children[0].innerHTML,
 					ownership:sentByNick==(nickname)?'message-own':'message-other',
 					timestamp:time.getTime(),
+
 				}
 				XMPP.mucs[roomJid].messages.push(newMessage);
 				XMPP.mucs[roomJid].NewMessageNotifyFunction(newMessage.from, newMessage.body);
