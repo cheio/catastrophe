@@ -34,8 +34,11 @@ XMPP =
 					type:stanza.attributes.type.value,
 					to:stanza.to,
 					body:stanza.children[0].innerHTML,
-					ownership:sentByNick==(nickname)?'message-own':'message-other',
+					ownership:sentByNick==(XMPP.mucs[roomJid].nickname)?'message-own':'message-other',
 					timestamp:time.getTime(),
+
+
+
 
 				}
 				XMPP.mucs[roomJid].messages.push(newMessage);
@@ -349,6 +352,12 @@ XMPP =
 		XMPP.conn.options.sync = true; // Switch to using synchronous requests since this is typically called onUnload.
 		XMPP.conn.flush();
 		XMPP.conn.disconnect();
+
+		XMPP.conn = null;
+		XMPP.ownJID = null;
+		XMPP.roster = {};
+		XMPP.mucs = {};
+
 	}
 
 }
