@@ -7,6 +7,7 @@ XMPP =
 	connectionStatus: 0,
 	conn: null,
 	ownJID: null,
+	ownVcard: {},
 	roster: {},
 	mucs:{},
 	OnCustomConnected:null,
@@ -36,10 +37,6 @@ XMPP =
 					body:stanza.children[0].innerHTML,
 					ownership:sentByNick==(XMPP.mucs[roomJid].nickname)?'message-own':'message-other',
 					timestamp:time.getTime(),
-
-
-
-
 				}
 				XMPP.mucs[roomJid].messages.push(newMessage);
 				XMPP.mucs[roomJid].NewMessageNotifyFunction(newMessage.from, newMessage.body);
@@ -74,6 +71,8 @@ XMPP =
 		XMPP.mucs[jid]= new XMPP.RoomClient ( jid, nickname, NewMessageNotifyFunction);
 		return XMPP.mucs[jid];
 	},
+
+	OnMucInvitation: null,
 
 	Init: function(boshurl)
 	{
@@ -129,14 +128,14 @@ XMPP =
 
 	OnIqStanza: function(stanza) { console.log(stanza); },
 	OnMessageStanza: function(stanza)
-	{	
+	{	//console.log(stanza);
 		if (stanza.attributes.type.value=="chat")
 		{
 			for (i=0; i<stanza.childNodes.length; i++)
 			{
+				from=stanza.attributes["from"].value.match(/^[^\/]*/)[0];
 				if(stanza.childNodes[i].localName=="body")
 				{
-					from=stanza.attributes["from"].value.match(/^[^\/]*/)[0];
 					fBody=stanza.childNodes[i].innerHTML;
 					newMessageObject={
 						from:from,
@@ -158,7 +157,7 @@ XMPP =
 					}
 					else
 					{
-						console.warn("XMPP.roster["+from+"].OnMessage is null")
+						console.warn("XMPP.roster["+from+"].OnMessage is null");
 					}
 					console.log(XMPP.OnMessage);
 					if (XMPP.OnMessage!=null)
@@ -167,9 +166,32 @@ XMPP =
 					}
 					else
 					{
-						console.warn("XMPP.OnMessage is null")
+						console.warn("XMPP.OnMessage is null");
 					}
 				}
+				else if(stanza.childNodes[i].localName=="composing" && XMPP.OnWriting != null)
+				{
+					XMPP.OnWriting(from);
+				}
+				else if(stanza.childNodes[i].localName=="paused" && XMPP.OnStopWriting != null)
+				{
+					XMPP.OnStopWriting(from);
+				}
+			}
+		}
+		else if(stanza.attributes.type.value=="normal")
+		{	
+			var inviteElems = stanza.getElementsByTagName("invite");
+			if(inviteElems.length > 0){	
+				var inviteElem = inviteElems[0];
+				var muc = stanza.attributes["from"].value.match(/^[^\/]*/)[0];
+				var from = inviteElem.attributes["from"].value.match(/^[^\/]*/)[0];
+				var reasonElem = stanza.getElementsByTagName("reason");
+				if(reasonElem.length > 0)
+					var reason = reasonElem[0].innerHTML;
+				if (XMPP.OnMucInvitation!=null)
+					XMPP.OnMucInvitation(from,muc,reason);
+				console.log("MUC-invitation from " + from + " in MUC: " + muc);
 			}
 		}
 		return true;
@@ -181,15 +203,20 @@ XMPP =
 		XMPP.conn.addHandler(XMPP.OnMessageStanza, null, "message",null,null,null);
 		// XMPP.conn.addHandler(XMPP.OnIqStanza, null, "iq");
 		XMPP.conn.addHandler(XMPP.OnSubscriptionRequest, null, "presence", "subscribe");
+		XMPP.conn.addHandler(XMPP.OnMessageStanza,null, "message"); 
 		XMPP.conn.send($pres().tree());
-		if (XMPP.OnCustomConnected!=null)
-		{
-			XMPP.OnCustomConnected();
-		}
+		XMPP.RequestVcard(XMPP.ownJID,function(vcard){XMPP.ownVcard = vcard
+			if (XMPP.OnCustomConnected!=null)
+			{
+				XMPP.OnCustomConnected();
+			}
+			});
 		return true;
 	},
 
 	OnMessage: null,
+	OnWriting: null,
+	OnStopWriting: null,
 	OnDisconnect: null,
 
 	RefreshRoster: function(OnRosterUpdated)
@@ -205,6 +232,9 @@ XMPP =
 				daContact.screenName=daContact.jid.match(/^[^@]*/)[0];
 				daContact.temporary=false;
 				XMPP.roster[daContact.jid]=daContact;
+				XMPP.RequestVcard(daContact.jid,function(vcard,jid){
+					XMPP.roster[jid].vcard = vcard;
+					});
 			}
 			OnRosterUpdated(XMPP.roster);
 		});
@@ -259,12 +289,50 @@ XMPP =
 	},
 
 
-	RequestVcard: function(from)
+	RequestVcard: function(from,callback)
 	{
 		from=from.replace(/\/.*$/,'');		// remove ressource
-		var req=$iq({"from":from,"type":"get","id":"vc2"}).c("vCard", {"xmlns":"vcard-temp"});
-		XMPP.conn.send(req.tree());
-		console.log("requesting "+from);
+		XMPP.conn.vcard.get(
+				    function success(iq){
+							var vcard = iq.getElementsByTagName("vCard")[0];
+							callback(getXMLToArray(vcard),from);
+				    },from,
+				    function failure(iq){
+				        callback(false);
+				    },30000/*timeout sendIQ*/
+				);
+	},
+
+	SetVcard: function(vcardObj,callback)
+	{
+
+        vcard = "<vCard>";
+        if("N" in vcardObj){
+            vcard = vcard + "<N>";
+            if("GIVEN" in vcardObj.N) vcard = vcard + "<GIVEN>" + vcardObj.N.GIVEN + "</GIVEN>";
+            if("FAMILY" in vcardObj.N) vcard = vcard + "<FAMILY>" + vcardObj.N.FAMILY + "</FAMILY>";
+            vcard = vcard + "</N>"; }
+        if("X-GENDER" in vcardObj) vcard = vcard + "<X-GENDER>" + vcardObj["X-GENDER"] + "</X-GENDER>";
+        if("BDAY" in vcardObj) vcard = vcard + "<BDAY>" + vcardObj.BDAY +  "</BDAY>";
+        if(typeof vcardObj.MARITAL === 'object' && "STATUS" in vcardObj.MARITAL) vcard = vcard + "<MARITAL><STATUS>" + vcardObj.MARITAL.STATUS + "</STATUS></MARITAL>";
+        if("ADR" in vcardObj){
+            vcard = vcard + "<ADR>";
+            if("CTRY" in vcardObj.ADR) vcard = vcard + "<CTRY>" + vcardObj.ADR.CTRY + "</CTRY>";
+            if("LOCALITY" in vcardObj.ADR) vcard = vcard + "<LOCALITY>" + vcardObj.ADR.LOCALITY + "</LOCALITY>";
+            vcard = vcard + "</ADR>"; }
+        if("ROLE" in vcardObj) vcard = vcard + "<ROLE>" + vcardObj.ROLE + "</ROLE>";
+        if("DESC" in vcardObj) vcard = vcard + "<DESC>" + vcardObj.DESC + "</DESC>";
+        if("PHOTO" in vcardObj){
+            vcard = vcard + "<PHOTO>";
+            if("BINVAL" in vcardObj.PHOTO) vcard = vcard + "<BINVAL>" + vcardObj.PHOTO.BINVAL + "</BINVAL>";
+            if("TYPE" in vcardObj.PHOTO) vcard = vcard + "<TYPE>" + vcardObj.PHOTO.TYPE + "</TYPE>";
+            vcard = vcard + "</PHOTO>"; }
+        vcard = vcard + "</vCard>";
+
+        vcardDoc = $.parseXML(vcard);
+        vcardElem = vcardDoc.documentElement;
+
+		XMPP.conn.vcard.set(function success(iq){ XMPP.ownVcard = vcardObj; callback(iq); return true; },vcardElem,XMPP.ownJID,function success(iq){ callback(iq); return false; });
 	},
 
 	ChangeVcardNick: function(to)
@@ -352,12 +420,30 @@ XMPP =
 		XMPP.conn.options.sync = true; // Switch to using synchronous requests since this is typically called onUnload.
 		XMPP.conn.flush();
 		XMPP.conn.disconnect();
-
 		XMPP.conn = null;
 		XMPP.ownJID = null;
 		XMPP.roster = {};
 		XMPP.mucs = {};
-
 	}
 
+}
+
+
+function getXMLToArray(xmlDoc){
+    var thisArray = new Array();
+    //Check XML doc
+    if($(xmlDoc).children().length > 0){
+    //Foreach Node found
+    $(xmlDoc).children().each(function(){    
+        if($(xmlDoc).find(this.nodeName).children().length > 0){
+        //If it has children recursively get the inner array
+        var NextNode = $(xmlDoc).find(this.nodeName);
+        thisArray[this.nodeName] = getXMLToArray(NextNode);
+        } else {
+        //If not then store the next value to the current array
+        thisArray[this.nodeName] = $(xmlDoc).find(this.nodeName).text();
+        }
+    });
+    }
+    return thisArray;
 }
