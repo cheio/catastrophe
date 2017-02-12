@@ -9,8 +9,23 @@ XMPP =
 	ownJID: null,
 	ownVCard: {},
 	roster: {},
-	mucs:{},
+
+//================================================== 
+//			EVENTS	
+//================================================== 
+
 	OnCustomConnected:null,
+	OnWriting: null,
+	OnStopWriting: null,
+	OnDisconnect: null,
+	OnError:null,
+	OnWarning:null,
+
+//================================================== 
+//			MUC
+//================================================== 
+
+	mucs:{},
 	RoomClient: function(roomJid, nickname, NewMessageNotifyFunction)
 	{
 		this.messages=[];
@@ -87,6 +102,18 @@ XMPP =
 
 	OnMucInvitation: null,
 
+	ChangeMucNick: function(nick)
+	{
+		// not implemented yet
+		// var st=$pres({"id":GetUniqueID(), "to":mucserver+nick});
+		// XMPP.conn.send(st.tree());
+	},
+
+
+//================================================== 
+//			SESSION
+//================================================== 
+
 	Init: function(boshurl)
 	{
 		XMPP.conn=new Strophe.Connection(boshurl);
@@ -117,6 +144,7 @@ XMPP =
 			case Strophe.Status.CONNFAIL: console.log("No Connection"); break;
 
 			case Strophe.Status.AUTHFAIL: if (XMPP.OnError!=null) XMPP.OnError("authentication"); break;
+			default: XMPP.OnWarning("???");break;
 
 		}
 		XMPP.connectionStatus=nStatus;
@@ -124,6 +152,97 @@ XMPP =
 	},
 
 	OnIqStanza: function(stanza) { console.log(stanza); },
+
+
+	OnConnected: function()
+	{
+		// XMPP.conn.addHandler(OnPresenceStanza, null, "presence");
+		//XMPP.conn.addHandler(XMPP.OnMessageStanza, null, "message",null,null,null);
+		// XMPP.conn.addHandler(XMPP.OnIqStanza, null, "iq");
+		XMPP.conn.addHandler(XMPP.OnSubscriptionRequest, null, "presence", "subscribe");
+		XMPP.conn.addHandler(XMPP.OnMessageStanza,null, "message"); 
+		XMPP.conn.send($pres().tree());
+		XMPP.RequestUploadService();
+		XMPP.RequestVCard(XMPP.ownJID,function(vcard) { XMPP.ownVCard = vcard });
+		XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);
+		if (XMPP.OnCustomConnected!=null) { XMPP.OnCustomConnected(); }
+		return true;
+	},
+
+
+	logout: function()
+	{
+		console.warn("XMPP.logout is deprecated. Use XMPP.Logout instead");
+		XMPP.Logout();
+	},
+
+	Logout: function()
+	{
+		XMPP.conn.options.sync = true; // Switch to using synchronous requests since this is typically called onUnload.
+		XMPP.conn.flush();
+		XMPP.conn.disconnect();
+		XMPP.conn = null;
+		XMPP.ownJID = null;
+		XMPP.roster = {};
+		XMPP.mucs = {};
+	},
+//================================================== 
+//			ROSTER
+//================================================== 
+
+	RefreshRoster: function(OnRosterUpdated)
+	{
+		XMPP.conn.roster.get(function()
+		{
+			XMPP.roster={};
+			for (contact in XMPP.conn.roster.items)
+			{
+				var currentContact=XMPP.conn.roster.items[contact];
+				currentContact.OnMessage=null;
+				currentContact.messages=[];
+				currentContact.screenName=currentContact.jid.match(/^[^@]*/)[0];
+				currentContact.temporary=false;
+				XMPP.roster[currentContact.jid]=currentContact;
+				XMPP.RequestVCard(currentContact.jid,function(vcard,jid){ XMPP.roster[jid].vcard = vcard; });
+			}
+			OnRosterUpdated(XMPP.roster);
+		});
+	},
+
+	AddToRoster: function(jid,message)
+	{
+		XMPP.conn.roster.subscribe(jid,message);
+		XMPP.conn.roster.authorize(jid,"");
+		XMPP.conn.roster.add(jid,message,"",function(what){console.log(what);});
+	},
+	RemoveFromRoster: function(jid)
+	{
+		XMPP.conn.roster.unsubscribe(jid, "");
+		XMPP.conn.roster.unauthorize(jid, "");
+		XMPP.conn.roster.remove(jid);
+		XMPP.conn.roster.removeItem(jid);
+	},
+	AuthorizeRequest: function(jid) {XMPP.conn.roster.authorize(jid,"");},
+
+
+	GetUniqueID: function() { XMPP.conn.getUniqueId("my:code"); },
+
+//================================================== 
+//			MESSAGING
+//================================================== 
+
+	OnMessage: null,
+	AddMessageToHistory: function(newMessageObject)
+	{
+		if(!(from in XMPP.roster)) { XMPP.roster[from] = {messages: []}; }
+		XMPP.roster[from].messages.push(newMessageObject);
+		if (newMessageObject.ownership=='message-other')
+		{
+			if (XMPP.roster[from].OnMessage != null) { XMPP.roster[from].OnMessage(fBody); }
+			if (XMPP.OnMessage!=null) { XMPP.OnMessage(from,fBody); }
+		}
+	},
+
 	OnMessageStanza: function(stanza)
 	{	//console.log(stanza);
 		if (stanza.attributes.type.value=="chat")
@@ -134,7 +253,8 @@ XMPP =
 				if(stanza.childNodes[i].localName=="body")
 				{
 					fBody=stanza.childNodes[i].innerHTML;
-					newMessageObject={
+					newMessageObject=
+					{
 						from:from,
 						type:stanza.attributes.type.value,
 						to:stanza.to,
@@ -143,32 +263,9 @@ XMPP =
 						timestamp:new Date().getTime(),
 			
 					}
-					if(XMPP.OnStopWriting !=null)
-					{
-						XMPP.OnStopWriting(from);
-					}
-					if(!(from in XMPP.roster))
-					{
-						XMPP.roster[from] = {messages: []};
-					}			
-					XMPP.roster[from].messages.push(newMessageObject);
-					if (XMPP.roster[from].OnMessage != null)
-					{
-						XMPP.roster[from].OnMessage(fBody);
-					}
-					else
-					{
-						console.warn("XMPP.roster["+from+"].OnMessage is null");
-					}
-					console.log(XMPP.OnMessage);
-					if (XMPP.OnMessage!=null)
-					{
-						XMPP.OnMessage(from,fBody);
-					}
-					else
-					{
-						console.warn("XMPP.OnMessage is null");
-					}
+					XMPP.AddMessageToHistory(newMessageObject);
+
+					if (XMPP.OnStopWriting !=null) { XMPP.OnStopWriting(from); }
 				}
 				else if(stanza.childNodes[i].localName=="composing" && XMPP.OnWriting != null)
 				{
@@ -197,74 +294,6 @@ XMPP =
 		}
 		return true;
 	},
-
-	OnConnected: function()
-	{
-		// XMPP.conn.addHandler(OnPresenceStanza, null, "presence");
-		//XMPP.conn.addHandler(XMPP.OnMessageStanza, null, "message",null,null,null);
-		// XMPP.conn.addHandler(XMPP.OnIqStanza, null, "iq");
-		XMPP.conn.addHandler(XMPP.OnSubscriptionRequest, null, "presence", "subscribe");
-		XMPP.conn.addHandler(XMPP.OnMessageStanza,null, "message"); 
-		XMPP.conn.send($pres().tree());
-		XMPP.RequestUploadService();
-		XMPP.RequestVcard(XMPP.ownJID,function(vcard){XMPP.ownVCard = vcard
-			if (XMPP.OnCustomConnected!=null)
-			{
-				XMPP.OnCustomConnected();
-			}
-			});
-		return true;
-	},
-
-	OnMessage: null,
-	OnWriting: null,
-	OnStopWriting: null,
-	OnDisconnect: null,
-	OnError:null,
-	OnWarning:null,
-
-	RefreshRoster: function(OnRosterUpdated)
-	{
-		XMPP.conn.roster.get(function()
-		{
-			XMPP.roster={};
-			for (contact in XMPP.conn.roster.items)
-			{
-				var daContact=XMPP.conn.roster.items[contact];
-				daContact.OnMessage=null;
-				daContact.messages=[];
-				daContact.screenName=daContact.jid.match(/^[^@]*/)[0];
-				daContact.temporary=false;
-				XMPP.roster[daContact.jid]=daContact;
-				XMPP.RequestVcard(daContact.jid,function(vcard,jid){
-					XMPP.roster[jid].vcard = vcard;
-					});
-			}
-			OnRosterUpdated(XMPP.roster);
-		});
-	},
-
-	AddToRoster: function(jid,message)
-	{
-		XMPP.conn.roster.subscribe(jid,message);
-		XMPP.conn.roster.authorize(jid,"");
-		XMPP.conn.roster.add(jid,message,"",function(what){console.log(what);});
-	},
-	RemoveFromRoster: function(jid)
-	{
-		XMPP.conn.roster.unsubscribe(jid, "");
-		XMPP.conn.roster.unauthorize(jid, "");
-		XMPP.conn.roster.remove(jid);
-		XMPP.conn.roster.removeItem(jid);
-	},
-	AuthorizeRequest: function(jid) {XMPP.conn.roster.authorize(jid,"");},
-
-
-	GetUniqueID: function()
-	{
-		XMPP.conn.getUniqueId("my:code");
-	},
-
 	SendPrivateMessage: function(to,message)
 	{
 		var imc = $msg({"id":XMPP.GetUniqueID(), "to":to, 'type':'chat'}).c("body").t(message);
@@ -273,7 +302,8 @@ XMPP =
 		{
 			XMPP.roster[to]= { jid:to, temporary:true, screenName:to.match(/^[^@]*/)[0], messages:[] };
 		}
-		newMessageObject={
+		newMessageObject=
+		{
 			from:XMPP.ownJID,
 			type:'chat',
 			to:to,
@@ -291,19 +321,71 @@ XMPP =
 		XMPP.conn.send( imc.tree());
 	},
 
-
-	ChangeMucNick: function(nick)
+	OnMessageCarbonReceived(carbon)
 	{
-		// not implemented yet
-		// var st=$pres({"id":GetUniqueID(), "to":mucserver+nick});
-		// XMPP.conn.send(st.tree());
+		debug.log("Carbon");
+		debug.log(carbon);
+		newMessageObject={};
+		if (carbon.direction=='sent')
+		{
+			newMessageObject=
+			{
+				from:XMPP.ownJID,
+				to:carbon.to,
+				ownership:'message-own',
+			}
+		}
+		else
+		{
+			newMessageObject=
+			{
+				from:carbon.to,
+				to:XMPP.ownJID,
+				ownership:'message-other',
+			}
+		}
+		newMessageObject.type=carbon.type;
+		newMessageObject.body=carbon.innerMessage;
+		newMessageObject.timestamp=new Date().getTime();
+		XMPP.AddMessageToHistory(newMessageObject);
 	},
+
+
+
+	OnSubRequest: null,
+
+	OnSubRequestAccepted: null,
+
+	OnSubscriptionRequest: function(stanza)
+	{	
+		var from = stanza.getAttribute("from");
+		console.log("Subscription-request from " + from);
+		if(from in XMPP.roster)
+		{
+		    // Send a 'subscribed' notification back to accept the incoming
+		    // subscription request
+		    XMPP.conn.send($pres({ to: from, type: "subscribed" }));
+			XMPP.AuthorizeRequest(from);
+		    if (XMPP.OnSubRequestAccepted!=null) XMPP.OnSubRequestAccepted(from);
+		}
+		else
+		{
+			    if (XMPP.OnSubRequest!=null) XMPP.OnSubRequest(from);
+		}
+
+		return true;
+	},
+
+
+//================================================== 
+//			VCARD
+//================================================== 
 
 
 	RequestVcard: function(from,callback)
 	{
 		console.warn("RequestVcard is deprecated. Use RequestVCard instead");
-		XMPP.ReqestVCard(vCardObject,callback);
+		XMPP.ReqestVCard(from,callback);
 	},
 	RequestVCard: function(from,callback)
 	{
@@ -313,7 +395,8 @@ XMPP =
 					{
 						var vcard = iq.getElementsByTagName("vCard")[0];
 						callback(getXMLToArray(vcard),from);
-					},from,
+					}
+					,from,
 					function failure(iq)
 					{
 						callback(false);
@@ -375,6 +458,10 @@ XMPP =
 	},
 
 
+//================================================== 
+//		INBAND REGISTRATION
+//================================================== 
+
 
 	RegisterUser: function(user,password,server,callback)
 	{
@@ -415,7 +502,7 @@ XMPP =
 
 	OnRegister: function(nStatus)
 	{
-		console.log("Reg..");
+		console.warn("XMPP.OnRegister is deprecated. It's a silly function.");
 		switch(nStatus)
 		{
 			default: OnConnectionStatus(nStatus);
@@ -423,46 +510,6 @@ XMPP =
 		return true;
 	},
 
-	OnSubRequest: null,
-
-	OnSubRequestAccepted: null,
-
-	OnSubscriptionRequest: function(stanza)
-	{	
-		var from = stanza.getAttribute("from");
-		console.log("Subscription-request from " + from);
-		if(from in XMPP.roster)
-		{
-		    // Send a 'subscribed' notification back to accept the incoming
-		    // subscription request
-		    XMPP.conn.send($pres({ to: from, type: "subscribed" }));
-			XMPP.AuthorizeRequest(from);
-		    if (XMPP.OnSubRequestAccepted!=null) XMPP.OnSubRequestAccepted(from);
-		}
-        else
-        {
-		    if (XMPP.OnSubRequest!=null) XMPP.OnSubRequest(from);
-        }
-
-		return true;
-	},
-
-	logout: function()
-	{
-		console.warn("XMPP.logout is deprecated. Use XMPP.Logout instead");
-		XMPP.Logout();
-	}
-
-	Logout: function()
-	{
-		XMPP.conn.options.sync = true; // Switch to using synchronous requests since this is typically called onUnload.
-		XMPP.conn.flush();
-		XMPP.conn.disconnect();
-		XMPP.conn = null;
-		XMPP.ownJID = null;
-		XMPP.roster = {};
-		XMPP.mucs = {};
-	},
 
 }
 
