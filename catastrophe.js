@@ -14,6 +14,7 @@ XMPP =
 	RoomClient: function(roomJid, nickname, NewMessageNotifyFunction)
 	{
 		this.messages=[];
+		this.occupants=[];
 		messages=this.messages;
 		this.NewMessageNotifyFunction = NewMessageNotifyFunction;
 		this.nickname=nickname;
@@ -55,6 +56,17 @@ XMPP =
 			XMPP.conn.muc.groupchat(roomJid, body);
 		};
 
+		this.refreshOccupants = function(callback)
+		{
+			XMPP.conn.muc.queryOccupants(roomJid,function(stanza){
+				var occupantsArray = [];
+				var itemArray = stanza.getElementsByTagName("item");
+				for(i=0;i<itemArray.length;i++) occupantsArray.push("" + itemArray[i].getAttribute("name"));
+				XMPP.mucs[roomJid].occupants = occupantsArray;
+				callback(this.occupants);
+			});
+		};
+
 		this.InviteUser = function(userJid,message)
 		{
 			console.log(roomJid);
@@ -69,6 +81,7 @@ XMPP =
 	JoinMuc: function(jid,nickname,NewMessageNotifyFunction)
 	{
 		XMPP.mucs[jid]= new XMPP.RoomClient ( jid, nickname, NewMessageNotifyFunction);
+		XMPP.mucs[jid].refreshOccupants();
 		return XMPP.mucs[jid];
 	},
 
@@ -128,10 +141,7 @@ XMPP =
 
 	OnIqStanza: function(stanza) { console.log(stanza); },
 	OnMessageStanza: function(stanza)
-
 	{	//console.log(stanza);
-
-	{
 
 		if (stanza.attributes.type.value=="chat")
 		{
@@ -181,7 +191,6 @@ XMPP =
 				{
 					XMPP.OnStopWriting(from);
 				}
-
 			}
 		}
 		else if(stanza.attributes.type.value=="normal")
@@ -197,7 +206,6 @@ XMPP =
 				if (XMPP.OnMucInvitation!=null)
 					XMPP.OnMucInvitation(from,muc,reason);
 				console.log("MUC-invitation from " + from + " in MUC: " + muc);
-
 			}
 		}
 		return true;
