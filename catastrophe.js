@@ -309,19 +309,22 @@ XMPP =
 	{
 		from=from.replace(/\/.*$/,'');		// remove ressource
 		XMPP.conn.vcard.get(
-				    function success(iq){
-							var vcard = iq.getElementsByTagName("vCard")[0];
-							callback(getXMLToArray(vcard),from);
-				    },from,
-				    function failure(iq){
-				        callback(false);
-				    },30000/*timeout sendIQ*/
+					function success(iq)
+					{
+						var vcard = iq.getElementsByTagName("vCard")[0];
+						callback(getXMLToArray(vcard),from);
+					},from,
+					function failure(iq)
+					{
+						callback(false);
+					}
+					,30000/*timeout sendIQ*/
 				);
 	},
 
 	SetVcard: function(vCardObject,callback)
 	{
-		console.warn("SetVcard is deprecated. Use SetVCard instead");
+		console.warn("SetVcard is deprecated. Use SetVCard instead.");
 		XMPP.SetVCard(vCardObject,callback);
 	},
 	SetVCard: function(vCardObject,callback)
@@ -355,10 +358,12 @@ XMPP =
 		}
 		vCardXML = vCardXML + "</vCard>";
 
-		vcardDoc = $.parseXML(vCardXML);
-		vcardElem = vcardDoc.documentElement;
+		vCardDoc = $.parseXML(vCardXML);
+		//vCardDoc = $parseXML(vCardXML);		// not tested yet
 
-		XMPP.conn.vCardXML.set(function success(iq){ XMPP.ownVCard = vCardObject; callback(iq); return true; },vcardElem,XMPP.ownJID,function success(iq){ callback(iq); return false; });
+		vCardElement = vCardDoc.documentElement;
+
+		XMPP.conn.vcard.set(function success(iq){ XMPP.ownVCard = vCardObject; callback(iq); return true; },vCardElement,XMPP.ownJID,function success(iq){ callback(iq); return false; });
 	},
 
 	ChangeVcardNick: function(to)
@@ -462,21 +467,43 @@ XMPP =
 }
 
 
-function getXMLToArray(xmlDoc){
-    var thisArray = new Array();
-    //Check XML doc
-    if($(xmlDoc).children().length > 0){
-    //Foreach Node found
-    $(xmlDoc).children().each(function(){    
-        if($(xmlDoc).find(this.nodeName).children().length > 0){
-        //If it has children recursively get the inner array
-        var NextNode = $(xmlDoc).find(this.nodeName);
-        thisArray[this.nodeName] = getXMLToArray(NextNode);
-        } else {
-        //If not then store the next value to the current array
-        thisArray[this.nodeName] = $(xmlDoc).find(this.nodeName).text();
-        }
-    });
-    }
-    return thisArray;
+
+function $parsexml (xml)
+{
+	if (window.DOMParser)
+	{
+		var parser = new DOMParser ();
+		return parser.parseFromString (xml, "text/xml");
+	}
+	else
+	{
+		console.warn("Internet Explorer not supported.");
+		return false;
+	}
+}
+
+
+function getXMLToArray(xmlDoc)
+{
+	var thisArray = new Array();
+	//Check XML doc
+	if($(xmlDoc).children().length > 0)
+	{
+		//Foreach Node found
+		$(xmlDoc).children().each(function()
+		{
+			if($(xmlDoc).find(this.nodeName).children().length > 0)
+			{
+				//If it has children recursively get the inner array
+				var NextNode = $(xmlDoc).find(this.nodeName);
+				thisArray[this.nodeName] = getXMLToArray(NextNode);
+			}
+			else
+			{
+				//If not then store the next value to the current array
+				thisArray[this.nodeName] = $(xmlDoc).find(this.nodeName).text();
+			}
+		});
+	}
+	return thisArray;
 }
