@@ -108,7 +108,7 @@ XMPP =
 
 	OnConnectionStatus: function(nStatus)
 	{
-		console.log(nStatus);
+		// console.log(nStatus);
 		switch(nStatus)
 		{
 			case Strophe.Status.CONNECTING: console.log("Connecting"); break;
@@ -116,28 +116,17 @@ XMPP =
 			case Strophe.Status.CONNECTED: console.log("Connected"); XMPP.OnConnected(); break;
 			case Strophe.Status.CONNFAIL: console.log("No Connection"); break;
 
-			case Strophe.Status.REGISTER:
-				// not implemented yet
-				/* console.log("submitting");
-				XMPP.conn.register.fields.username=XMPP.ownJID;
-				XMPP.conn.register.fields.password=ownpass;
-				XMPP.conn.register.submit()*/
-				break;
-			case Strophe.Status.REGISTERED:
-				console.log("submitting");
-				alert("Hat geklappt,log dich ein!");
-				XMPP.conn.disconnect();
-				alert("Hat geklappt,log dich ein!");
-				break;
-			case Strophe.Status.AUTHFAIL: alert("Benutzername/Paßwort falsch"); break;
-			case Strophe.Status.CONFLICT: alert("User gibt's schon"); break;
-			case Strophe.Status.REGIFAIL: alert("Das war nix"); break;
+			case Strophe.Status.AUTHFAIL: XMPP.OnError("authentication"); break;
+			default: OnWarning("Status "+n+" occured");
 
-			case 4:loginError(); console.log("nach"); break;
+			// case 4:loginError(); console.log("nach"); break;
 		}
 		XMPP.connectionStatus=nStatus;
 		return true;
 	},
+
+	OnError: null,
+	OnWarning: null,
 
 	OnIqStanza: function(stanza) { console.log(stanza); },
 	OnMessageStanza: function(stanza)
@@ -279,7 +268,7 @@ XMPP =
 	{
 		var imc = $msg({"id":XMPP.GetUniqueID(), "to":to, 'type':'chat'}).c("body").t(message);
 		XMPP.conn.send( imc.tree());
-		if(!to in XMPP.roster)
+		if(!(to in XMPP.roster))
 		{
 			XMPP.roster[to]= { jid:to, temporary:true, screenName:to.match(/^[^@]*/)[0], messages:[] };
 		}
