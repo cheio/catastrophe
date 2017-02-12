@@ -72,6 +72,8 @@ XMPP =
 		return XMPP.mucs[jid];
 	},
 
+	OnMucInvitation: null,
+
 	Init: function(boshurl)
 	{
 		XMPP.conn=new Strophe.Connection(boshurl);
@@ -126,7 +128,11 @@ XMPP =
 
 	OnIqStanza: function(stanza) { console.log(stanza); },
 	OnMessageStanza: function(stanza)
+
+	{	//console.log(stanza);
+
 	{
+
 		if (stanza.attributes.type.value=="chat")
 		{
 			for (i=0; i<stanza.childNodes.length; i++)
@@ -175,6 +181,23 @@ XMPP =
 				{
 					XMPP.OnStopWriting(from);
 				}
+
+			}
+		}
+		else if(stanza.attributes.type.value=="normal")
+		{	
+			var inviteElems = stanza.getElementsByTagName("invite");
+			if(inviteElems.length > 0){	
+				var inviteElem = inviteElems[0];
+				var muc = stanza.attributes["from"].value.match(/^[^\/]*/)[0];
+				var from = inviteElem.attributes["from"].value.match(/^[^\/]*/)[0];
+				var reasonElem = stanza.getElementsByTagName("reason");
+				if(reasonElem.length > 0)
+					var reason = reasonElem[0].innerHTML;
+				if (XMPP.OnMucInvitation!=null)
+					XMPP.OnMucInvitation(from,muc,reason);
+				console.log("MUC-invitation from " + from + " in MUC: " + muc);
+
 			}
 		}
 		return true;
@@ -186,6 +209,7 @@ XMPP =
 		XMPP.conn.addHandler(XMPP.OnMessageStanza, null, "message",null,null,null);
 		// XMPP.conn.addHandler(XMPP.OnIqStanza, null, "iq");
 		XMPP.conn.addHandler(XMPP.OnSubscriptionRequest, null, "presence", "subscribe");
+		XMPP.conn.addHandler(XMPP.OnMessageStanza,null, "message"); 
 		XMPP.conn.send($pres().tree());
 		XMPP.RequestVcard(XMPP.ownJID,function(vcard){XMPP.ownVcard = vcard
 			if (XMPP.OnCustomConnected!=null)
