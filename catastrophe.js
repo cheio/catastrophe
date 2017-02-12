@@ -128,7 +128,11 @@ XMPP =
 
 	OnIqStanza: function(stanza) { console.log(stanza); },
 	OnMessageStanza: function(stanza)
+
 	{	//console.log(stanza);
+
+	{
+
 		if (stanza.attributes.type.value=="chat")
 		{
 			for (i=0; i<stanza.childNodes.length; i++)
@@ -177,6 +181,7 @@ XMPP =
 				{
 					XMPP.OnStopWriting(from);
 				}
+
 			}
 		}
 		else if(stanza.attributes.type.value=="normal")
@@ -192,6 +197,7 @@ XMPP =
 				if (XMPP.OnMucInvitation!=null)
 					XMPP.OnMucInvitation(from,muc,reason);
 				console.log("MUC-invitation from " + from + " in MUC: " + muc);
+
 			}
 		}
 		return true;
