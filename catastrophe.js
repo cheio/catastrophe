@@ -220,8 +220,8 @@ XMPP =
 	OnWriting: null,
 	OnStopWriting: null,
 	OnDisconnect: null,
-	XMPP.OnError:null,
-	XMPP.OnWarning:null,
+	OnError:null,
+	OnWarning:null,
 
 	RefreshRoster: function(OnRosterUpdated)
 	{
