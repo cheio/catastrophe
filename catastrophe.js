@@ -7,7 +7,7 @@ XMPP =
 	connectionStatus: 0,
 	conn: null,
 	ownJID: null,
-	ownVcard: {},
+	ownVCard: {},
 	roster: {},
 	mucs:{},
 	OnCustomConnected:null,
@@ -207,7 +207,7 @@ XMPP =
 		XMPP.conn.addHandler(XMPP.OnMessageStanza,null, "message"); 
 		XMPP.conn.send($pres().tree());
 		XMPP.RequestUploadService();
-		XMPP.RequestVcard(XMPP.ownJID,function(vcard){XMPP.ownVcard = vcard
+		XMPP.RequestVcard(XMPP.ownJID,function(vcard){XMPP.ownVCard = vcard
 			if (XMPP.OnCustomConnected!=null)
 			{
 				XMPP.OnCustomConnected();
@@ -302,6 +302,11 @@ XMPP =
 
 	RequestVcard: function(from,callback)
 	{
+		console.warn("RequestVcard is deprecated. Use RequestVCard instead");
+		XMPP.ReqestVCard(vCardObject,callback);
+	},
+	RequestVCard: function(from,callback)
+	{
 		from=from.replace(/\/.*$/,'');		// remove ressource
 		XMPP.conn.vcard.get(
 				    function success(iq){
@@ -314,36 +319,46 @@ XMPP =
 				);
 	},
 
-	SetVcard: function(vcardObj,callback)
+	SetVcard: function(vCardObject,callback)
 	{
+		console.warn("SetVcard is deprecated. Use SetVCard instead");
+		XMPP.SetVCard(vCardObject,callback);
+	},
+	SetVCard: function(vCardObject,callback)
+	{
+		vCardXML = "<vCard>";
+		if("N" in vCardObject)
+		{
+		    vCardXML = vCardXML + "<N>";
+		    if("GIVEN" in vCardObject.N) vCardXML = vCardXML + "<GIVEN>" + vCardObject.N.GIVEN + "</GIVEN>";
+		    if("FAMILY" in vCardObject.N) vCardXML = vCardXML + "<FAMILY>" + vCardObject.N.FAMILY + "</FAMILY>";
+		    vCardXML = vCardXML + "</N>";
+		}
+		if("X-GENDER" in vCardObject) vCardXML = vCardXML + "<X-GENDER>" + vCardObject["X-GENDER"] + "</X-GENDER>";
+		if("BDAY" in vCardObject) vCardXML = vCardXML + "<BDAY>" + vCardObject.BDAY +  "</BDAY>";
+		if(typeof vCardObject.MARITAL === 'object' && "STATUS" in vCardObject.MARITAL) vCardXML = vCardXML + "<MARITAL><STATUS>" + vCardObject.MARITAL.STATUS + "</STATUS></MARITAL>";
+		if("ADR" in vCardObject)
+		{
+		    vCardXML = vCardXML + "<ADR>";
+		    if("CTRY" in vCardObject.ADR) vCardXML = vCardXML + "<CTRY>" + vCardObject.ADR.CTRY + "</CTRY>";
+		    if("LOCALITY" in vCardObject.ADR) vCardXML = vCardXML + "<LOCALITY>" + vCardObject.ADR.LOCALITY + "</LOCALITY>";
+		    vCardXML = vCardXML + "</ADR>";
+		}
+		if("ROLE" in vCardObject) vCardXML = vCardXML + "<ROLE>" + vCardObject.ROLE + "</ROLE>";
+		if("DESC" in vCardObject) vCardXML = vCardXML + "<DESC>" + vCardObject.DESC + "</DESC>";
+		if("PHOTO" in vCardObject)
+		{
+		    vCardXML = vCardXML + "<PHOTO>";
+		    if("BINVAL" in vCardObject.PHOTO) vCardXML = vCardXML + "<BINVAL>" + vCardObject.PHOTO.BINVAL + "</BINVAL>";
+		    if("TYPE" in vCardObject.PHOTO) vCardXML = vCardXML + "<TYPE>" + vCardObject.PHOTO.TYPE + "</TYPE>";
+		    vCardXML = vCardXML + "</PHOTO>";
+		}
+		vCardXML = vCardXML + "</vCard>";
 
-        vcard = "<vCard>";
-        if("N" in vcardObj){
-            vcard = vcard + "<N>";
-            if("GIVEN" in vcardObj.N) vcard = vcard + "<GIVEN>" + vcardObj.N.GIVEN + "</GIVEN>";
-            if("FAMILY" in vcardObj.N) vcard = vcard + "<FAMILY>" + vcardObj.N.FAMILY + "</FAMILY>";
-            vcard = vcard + "</N>"; }
-        if("X-GENDER" in vcardObj) vcard = vcard + "<X-GENDER>" + vcardObj["X-GENDER"] + "</X-GENDER>";
-        if("BDAY" in vcardObj) vcard = vcard + "<BDAY>" + vcardObj.BDAY +  "</BDAY>";
-        if(typeof vcardObj.MARITAL === 'object' && "STATUS" in vcardObj.MARITAL) vcard = vcard + "<MARITAL><STATUS>" + vcardObj.MARITAL.STATUS + "</STATUS></MARITAL>";
-        if("ADR" in vcardObj){
-            vcard = vcard + "<ADR>";
-            if("CTRY" in vcardObj.ADR) vcard = vcard + "<CTRY>" + vcardObj.ADR.CTRY + "</CTRY>";
-            if("LOCALITY" in vcardObj.ADR) vcard = vcard + "<LOCALITY>" + vcardObj.ADR.LOCALITY + "</LOCALITY>";
-            vcard = vcard + "</ADR>"; }
-        if("ROLE" in vcardObj) vcard = vcard + "<ROLE>" + vcardObj.ROLE + "</ROLE>";
-        if("DESC" in vcardObj) vcard = vcard + "<DESC>" + vcardObj.DESC + "</DESC>";
-        if("PHOTO" in vcardObj){
-            vcard = vcard + "<PHOTO>";
-            if("BINVAL" in vcardObj.PHOTO) vcard = vcard + "<BINVAL>" + vcardObj.PHOTO.BINVAL + "</BINVAL>";
-            if("TYPE" in vcardObj.PHOTO) vcard = vcard + "<TYPE>" + vcardObj.PHOTO.TYPE + "</TYPE>";
-            vcard = vcard + "</PHOTO>"; }
-        vcard = vcard + "</vCard>";
+		vcardDoc = $.parseXML(vCardXML);
+		vcardElem = vcardDoc.documentElement;
 
-        vcardDoc = $.parseXML(vcard);
-        vcardElem = vcardDoc.documentElement;
-
-		XMPP.conn.vcard.set(function success(iq){ XMPP.ownVcard = vcardObj; callback(iq); return true; },vcardElem,XMPP.ownJID,function success(iq){ callback(iq); return false; });
+		XMPP.conn.vCardXML.set(function success(iq){ XMPP.ownVCard = vCardObject; callback(iq); return true; },vcardElem,XMPP.ownJID,function success(iq){ callback(iq); return false; });
 	},
 
 	ChangeVcardNick: function(to)
@@ -427,7 +442,14 @@ XMPP =
 		return true;
 	},
 
-	logout: function(){
+	logout: function()
+	{
+		console.warn("XMPP.logout is deprecated. Use XMPP.Logout instead");
+		XMPP.Logout();
+	}
+
+	Logout: function()
+	{
 		XMPP.conn.options.sync = true; // Switch to using synchronous requests since this is typically called onUnload.
 		XMPP.conn.flush();
 		XMPP.conn.disconnect();
