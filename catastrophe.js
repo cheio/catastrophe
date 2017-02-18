@@ -7,8 +7,11 @@ XMPP =
 	connectionStatus: 0,
 	conn: null,
 	ownJID: null,
+	ownDomain: null,
 	ownVCard: {},
 	roster: {},
+	uploadService: false,
+    pubsubServer: false,
 
 //================================================== 
 //			EVENTS	
@@ -164,6 +167,8 @@ XMPP =
 		XMPP.conn.send($pres().tree());
 		XMPP.RequestServices();
 		XMPP.RequestVCard(XMPP.ownJID,function(vcard) { XMPP.ownVCard = vcard });
+		XMPP.ownDomain = XMPP.conn.domain;
+
 		// XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);	Do we need another StropheJS-Plugin for this? In Jabberbook this creates failures
 		if (XMPP.OnCustomConnected!=null) { XMPP.OnCustomConnected(); }
 		return true;
@@ -515,19 +520,25 @@ XMPP =
 //		HTTP UPLOAD
 //================================================== 
 
-	uploadService: false,
-
     RequestServices: function(){
 		var server = XMPP.ownJID.split("@")[1];
 		var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("query", {"xmlns":"http://jabber.org/protocol/disco#info"});
 		XMPP.conn.sendIQ(req,
 			function(iq){
+
+				// Searching for upload-service
 				var identities = iq.getElementsByTagName("identity");
-				for(i=0; i<identities.length; i++)
+				for(i=0; i<identities.length; i++){
 					if(identities[i].getAttribute("type") == "file")
 						XMPP.uploadService = true;
+					if(identities[i].getAttribute("category") == "pubsub")
+						XMPP.pubsubServer = "pubsub." + XMPP.ownDomain;
+				}
 				if(!XMPP.uploadService)
 					console.warn("No HTTP_Upload found on server!");
+				if(!XMPP.pubsubServer)
+					console.warn("No pubsub found on server!");		
+
 			},
 			function(iq){
 				console.warn("Requesting services but server gives an Error:");
@@ -585,9 +596,175 @@ XMPP =
 		});
 		return true;
     },
+    
 
+//================================================== 
+//  			Pubsubs	
+//================================================== 
+    
+    CreateNode: function(nodeName,callback){
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"create1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("create", {"node":nodeName});
+		XMPP.conn.sendIQ(req,function(iq){
+				console.log("Success!");
+				console.info(iq);
+				callback(true);
+			},
+			function(iq){
+				console.warn("Failure!");
+				console.info(iq);
+				callback(false);
+			});
+		return true;
+    },
+
+    DeleteNode: function(nodeName,callback){
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"delete1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub#owner"})
+		.c("delete", {"node":nodeName});
+		XMPP.conn.sendIQ(req,function(iq){
+				console.log("Success!");
+				console.info(iq);
+				callback(true);
+			},
+			function(iq){
+				console.warn("Failure!");
+				console.info(iq);
+				callback(false);
+			});
+		return true;
+    },
+
+    SubscribeNode: function(nodeName,callback){
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"sub1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("subscribe", {"node":nodeName, "jid":XMPP.ownJID});
+		XMPP.conn.sendIQ(req,function(iq){
+				console.log("Success!");
+				console.info(iq);
+				callback(true);
+			},
+			function(iq){
+				console.warn("Failure!");
+				console.info(iq);
+				callback(false);
+			});
+		return true;
+    },
+
+    UnsubscribeNode: function(nodeName,callback){
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"unsub1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("unsubscribe", {"node":nodeName, "jid":XMPP.ownJID});
+		XMPP.conn.sendIQ(req,function(iq){
+				console.log("Success!");
+				console.info(iq);
+				callback(true);
+			},
+			function(iq){
+				console.warn("Failure!");
+				console.info(iq);
+				callback(false);
+			});
+		return true;
+    },
+
+    GetNodeSubscriptions: function(nodeName,callback){
+		var req=$iq({"type":"get", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"subscriptions1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("subscriptions");
+		XMPP.conn.sendIQ(req,function(iq){
+				console.log("Success!");
+				console.info(iq);
+				var subscriptions = iq.getElemensByTagName("subscription");
+				callback(subscriptions);
+			},
+			function(iq){
+				console.warn("Failure!");
+				console.info(iq);
+				callback(false);
+			});
+		return true;
+    },
+
+    // Publishes a new item in a node and gives the id of the new item in the callback-function
+    PublishNodeItem: function(nodeName,title,text,callback){
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"unsub1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("publish", {"node":nodeName})
+		.c("item", {"id":hashCode(title + text + (new Date()))})
+		.c("entry", {"xmlns":"http://www.w3.org/2005/Atom"})
+		.c("title").t(title).up()
+		.c("summary").t(text).up()
+		.c("published").t(new Date()).up();
+		XMPP.conn.sendIQ(req,function(iq){
+				console.log("Success!");
+				console.info(iq);
+				callback(iq.getElementsById("item")[0].getAttribute("id"));
+			},
+			function(iq){
+				console.warn("Failure!");
+				console.info(iq);
+				callback(false);
+			});
+		return true;
+    },
+
+    DeleteNodeItem: function(nodeName,itemID,callback){
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"retract1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("retract", {"node":nodeName})
+		.c("item", {"id":itemID});
+		XMPP.conn.sendIQ(req,function(iq){
+				console.log("Success!");
+				console.info(iq);
+				callback(true);
+			},
+			function(iq){
+				console.warn("Failure!");
+				console.info(iq);
+				callback(false);
+			});
+		return true;
+    },
+
+    DeleteAllNodeItems: function(nodeName,callback){
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"purge1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("purge", {"node":nodeName});
+		XMPP.conn.sendIQ(req,function(iq){
+				console.log("Success!");
+				console.info(iq);
+				callback(true);
+			},
+			function(iq){
+				console.warn("Failure!");
+				console.info(iq);
+				callback(false);
+			});
+		return true;
+    },
+    
+    GetNodeItems: function(nodeName,callback){
+		var req=$iq({"type":"get", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"items1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("items", {"node":nodeName});
+		XMPP.conn.sendIQ(req,function(iq){
+				console.log("Success!");
+				console.info(iq);
+				var items = iq.getElemensByTagName("item");
+				callback(items);
+			},
+			function(iq){
+				console.warn("Failure!");
+				console.info(iq);
+				callback(false);
+			});
+		return true;
+    },
+	
 }
-
 
 
 function $parsexml (xml)
@@ -629,3 +806,7 @@ function getXMLToArray(xmlDoc)
 	}
 	return thisArray;
 }
+
+function hashCode(s){
+	  return s.split("").reduce(function(a,b){a=((a<<5)-a)+b.charCodeAt(0);return a&a},0);              
+	}
