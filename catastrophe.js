@@ -155,16 +155,16 @@ XMPP =
 
 
 	OnConnected: function()
-	{
+	{	
 		// XMPP.conn.addHandler(OnPresenceStanza, null, "presence");
 		//XMPP.conn.addHandler(XMPP.OnMessageStanza, null, "message",null,null,null);
 		// XMPP.conn.addHandler(XMPP.OnIqStanza, null, "iq");
 		XMPP.conn.addHandler(XMPP.OnSubscriptionRequest, null, "presence", "subscribe");
-		XMPP.conn.addHandler(XMPP.OnMessageStanza,null, "message"); 
+		XMPP.conn.addHandler(XMPP.OnMessageStanza,null, "message");
 		XMPP.conn.send($pres().tree());
-		XMPP.RequestUploadService();
+		XMPP.RequestServices();
 		XMPP.RequestVCard(XMPP.ownJID,function(vcard) { XMPP.ownVCard = vcard });
-		XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);
+		// XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);	Do we need another StropheJS-Plugin for this? In Jabberbook this creates failures
 		if (XMPP.OnCustomConnected!=null) { XMPP.OnCustomConnected(); }
 		return true;
 	},
@@ -510,6 +510,81 @@ XMPP =
 		return true;
 	},
 
+
+//================================================== 
+//		HTTP UPLOAD
+//================================================== 
+
+	uploadService: false,
+
+    RequestServices: function(){
+		var server = XMPP.ownJID.split("@")[1];
+		var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("query", {"xmlns":"http://jabber.org/protocol/disco#info"});
+		XMPP.conn.sendIQ(req,
+			function(iq){
+				var identities = iq.getElementsByTagName("identity");
+				for(i=0; i<identities.length; i++)
+					if(identities[i].getAttribute("type") == "file")
+						XMPP.uploadService = true;
+				if(!XMPP.uploadService)
+					console.warn("No HTTP_Upload found on server!");
+			},
+			function(iq){
+				console.warn("Requesting services but server gives an Error:");
+				console.log(iq);
+			});
+		return true;
+    },
+
+    RequestUploadSlot: function(filename,size,type,callback){
+		var server = XMPP.ownJID.split("@")[1];
+		var uploadServer = "upload." + server;
+		var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("request", {"xmlns":"urn:xmpp:http:upload","filename":filename,"size":size,"content-type":type});
+		req.c("filename").t(filename); //Prosody needs this as children and not as attributes :-(
+		req.up().c("size").t(size);
+		req.up().c("content-type").t(type);
+		XMPP.conn.sendIQ(req,function(iq){
+				callback(iq.getElementsByTagName("get")[0].innerHTML,iq.getElementsByTagName("put")[0].innerHTML);
+			},
+			function(iq){
+				console.warn("Failure!");
+			});
+		return true;
+    },
+
+    /*RequestAllUploadServices: function(){  // Maybe for other servers we need other requests, at this moment http_upload only works with prosody!
+		var server = XMPP.ownJID.split("@")[1];
+		var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("query", {"xmlns":"http://jabber.org/protocol/disco#items"});
+		XMPP.conn.sendIQ(req,function(iq){console.log(iq);},function(iq){console.log(iq);});
+		return true;
+    },*/
+
+    UploadFile: function(file,callbackGet,callbackReady){	// Rob, this is the function, we have to fill, to make file-upload working! :-D
+		if(!XMPP.uploadService) return false;
+		XMPP.RequestUploadSlot(file.name,file.size,file.type,function(get,put){
+		callbackGet(get);
+
+		/* We need to send a http-PUT-request with the file to the server, at this moment I have no solution for this. The ajax-Request doesnt work :-( */
+		    /*$.ajax({
+		        type: 'GET',
+			    url: get,
+		        crossDomain: true,
+				data: file,
+		        dataType: 'json',
+				contentType: file.type,
+		        success: function(responseData, textStatus, jqXHR) 
+		        {
+		            callbackReady();
+		        },
+		        error: function (responseData, textStatus, errorThrown) 
+		        {
+		            console.warn("ERROR!");
+		        }
+		    });*/
+
+		});
+		return true;
+    },
 
 }
 
