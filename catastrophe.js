@@ -168,6 +168,7 @@ XMPP =
 		XMPP.RequestServices();
 		XMPP.RequestVCard(XMPP.ownJID,function(vcard) { XMPP.ownVCard = vcard });
 		XMPP.ownDomain = XMPP.conn.domain;
+
 		// XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);	Do we need another StropheJS-Plugin for this? In Jabberbook this creates failures
 		if (XMPP.OnCustomConnected!=null) { XMPP.OnCustomConnected(); }
 		return true;
@@ -524,6 +525,7 @@ XMPP =
 		var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("query", {"xmlns":"http://jabber.org/protocol/disco#info"});
 		XMPP.conn.sendIQ(req,
 			function(iq){
+
 				// Searching for upload-service
 				var identities = iq.getElementsByTagName("identity");
 				for(i=0; i<identities.length; i++){
@@ -536,6 +538,7 @@ XMPP =
 					console.warn("No HTTP_Upload found on server!");
 				if(!XMPP.pubsubServer)
 					console.warn("No pubsub found on server!");		
+
 			},
 			function(iq){
 				console.warn("Requesting services but server gives an Error:");
