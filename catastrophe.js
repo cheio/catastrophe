@@ -175,15 +175,19 @@ XMPP =
 		XMPP.conn.send($pres().tree());
 		XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);
 		XMPP.ownDomain = XMPP.conn.domain;
-		XMPP.RequestServices(function(){
-			XMPP.RequestVCard(XMPP.ownJID,function(vcard) { 
-				XMPP.ownVCard = vcard; 
-				XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions){
-					XMPP.groups = subscriptions;
-					if (XMPP.OnCustomConnected!=null) {  XMPP.OnCustomConnected(); }
+		XMPP.RequestServices(function()
+			{
+				XMPP.RequestVCard(XMPP.ownJID,function(vcard) 
+					{ 
+						console.log("habib");
+						XMPP.ownVCard = vcard; 
 					});
-				});
-		});
+				XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions)
+					{
+						XMPP.groups = subscriptions;
+					});
+			});
+		if (XMPP.OnCustomConnected!=null) {  XMPP.OnCustomConnected(); }
 		return true;
 	},
 
@@ -468,6 +472,11 @@ XMPP =
 
 	ChangeVcardNick: function(to)
 	{
+		console.warn("ChangeVcardNick is depcrecated. Use ChangeVCardNick instead.");
+		ChangeVCardNick(to);
+	},
+	ChangeVCardNick: function(to)
+	{
 		var req=$iq({"id":GetUniqueID(), "type":"set"}).c("vCard", {"xmlns":"vcard-temp"});
 		req.c("NICKNAME").t(to);
 		XMPP.conn.send(req.tree());
@@ -542,6 +551,7 @@ XMPP =
 			{
 
 				// Searching for upload-service
+				console.log(iq);
 				var identities = iq.getElementsByTagName("identity");
 				for(i=0; i<identities.length; i++)
 				{
@@ -565,8 +575,9 @@ XMPP =
 			},
 			function(iq)
 			{
-				console.warn("Requesting services but server gives an Error:");
+				console.warn("Requesting services yields error:");
 				console.log(iq);
+				callback(false);
 			});
 		return true;
 	},
@@ -579,16 +590,17 @@ XMPP =
 	    	req.c("filename").t(filename); //Prosody needs this as children and not as attributes :-(
 	    	req.up().c("size").t(size);
 	    	req.up().c("content-type").t(type);
-	    	XMPP.conn.sendIQ(req,function(iq)	// if successful
-		{
-			callback(iq.getElementsByTagName("get")[0].innerHTML,iq.getElementsByTagName("put")[0].innerHTML);
-		},
-		function(iq)				// else
-		{
-			callback(false);
-			console.warn("Could not request upload slot");
-		});
-	return true;
+	    	XMPP.conn.sendIQ(req,
+			function(iq)	// if successful
+			{
+				callback(iq.getElementsByTagName("get")[0].innerHTML,iq.getElementsByTagName("put")[0].innerHTML);
+			},
+			function(iq)	// else
+			{
+				callback(false);
+				console.warn("Could not request upload slot");
+			});
+		return true;
 	},
 	
 	/*RequestAllUploadServices: function(){  // Maybe for other servers we need other requests, at this moment http_upload only works with prosody!
@@ -614,13 +626,10 @@ XMPP =
 					progressCallback(progress/total);
 				}
 			});
-			http.onreadystatechange = function()
+			http.addEventListener('load', function()
 			{
-				if (http.readyState==4)
-				{
-					console.log(http.responseText);
-				}
-			}
+					// console.log(http.responseText);
+			});
 			form= new FormData();
 			form.append("file",file);
 			http.open('post', put, true);
@@ -831,14 +840,16 @@ XMPP =
 		var req=$iq({"type":"get", "from": XMPP.ownJID, "to":pubsubServer, "id":"subscriptions1"})
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
 		.c("subscriptions");
-		XMPP.conn.sendIQ(req,function(iq){
+		XMPP.conn.sendIQ(req,function(iq)
+			{
 				var subscriptions = {};
 				var items = iq.getElementsByTagName("subscription");
 				for(var i=0; i<items.length; i++) subscriptions[items[i].getAttribute("node") + "@" + pubsubServer] = "subscribed";
 				callback(subscriptions);
 			},
-			function(iq){
-				console.warn("Failure!");
+			function(iq)
+			{
+				console.warn("Could not get pubsub subscriptions");
 				console.info(iq);
 				callback(false);
 			});
