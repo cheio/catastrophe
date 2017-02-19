@@ -10,16 +10,16 @@ XMPP =
 	ownDomain: null,
 	ownVCard: {},
 	roster: {},
-	uploadService: false,
-    pubsubServer: false,
+	httpUploadEnabled: false,
+	pubsubServer: false,
 
 //================================================== 
 //			EVENTS	
 //================================================== 
 
 	OnCustomConnected:null,
-	OnWriting: null,
-	OnStopWriting: null,
+	OnStartedTyping: null,
+	OnStoppedTyping: null,
 	OnDisconnect: null,
 	OnError:null,
 	OnWarning:null,
@@ -43,6 +43,7 @@ XMPP =
 
 		this.OnMessage = function(stanza, room)
 		{
+			console.log("oakg");
 			if (stanza.getElementsByTagName("body").length != 0)
 			{
 				if(stanza.getElementsByTagName("delay").length != 0) time = new Date(stanza.getElementsByTagName("delay")[0].attributes.stamp.value);
@@ -119,7 +120,13 @@ XMPP =
 
 	Init: function(boshurl)
 	{
+		if (navigator.appName=="Microsoft Internet Explorer")
+		{
+			console.error("Microsoft Internet Explorer is not supported. Please use a browser.");
+			return false;
+		}
 		XMPP.conn=new Strophe.Connection(boshurl);
+		return true;
 	},
 
 
@@ -169,8 +176,8 @@ XMPP =
 		XMPP.RequestVCard(XMPP.ownJID,function(vcard) { XMPP.ownVCard = vcard });
 		XMPP.ownDomain = XMPP.conn.domain;
 
-		// XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);	Do we need another StropheJS-Plugin for this? In Jabberbook this creates failures
-		if (XMPP.OnCustomConnected!=null) { XMPP.OnCustomConnected(); }
+		XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);
+		if (XMPP.OnCustomConnected!=null) {  XMPP.OnCustomConnected(); }
 		return true;
 	},
 
@@ -237,14 +244,14 @@ XMPP =
 //================================================== 
 
 	OnMessage: null,
-	AddMessageToHistory: function(newMessageObject)
+	HandleMessageObject: function(newMessageObject)
 	{
-		if(!(from in XMPP.roster)) { XMPP.roster[from] = {messages: []}; }
-		XMPP.roster[from].messages.push(newMessageObject);
+		if(!(newMessageObject.from in XMPP.roster)) { XMPP.roster[newMessageObject.from] = {messages: []}; }
+		XMPP.roster[newMessageObject.from].messages.push(newMessageObject);
 		if (newMessageObject.ownership=='message-other')
 		{
-			if (XMPP.roster[from].OnMessage != null) { XMPP.roster[from].OnMessage(fBody); }
-			if (XMPP.OnMessage!=null) { XMPP.OnMessage(from,fBody); }
+			if (XMPP.roster[newMessageObject.from].OnMessage != null) { XMPP.roster[newMessageObject.from].OnMessage(newMessageObject.body); }
+			if (XMPP.OnMessage!=null) { XMPP.OnMessage(newMessageObject.from,newMessageObject.body); }
 		}
 	},
 
@@ -257,28 +264,28 @@ XMPP =
 				from=stanza.attributes["from"].value.match(/^[^\/]*/)[0];
 				if(stanza.childNodes[i].localName=="body")
 				{
-					fBody=stanza.childNodes[i].innerHTML;
+					messageBody=stanza.childNodes[i].innerHTML;
 					newMessageObject=
 					{
 						from:from,
 						type:stanza.attributes.type.value,
 						to:stanza.to,
-						body:fBody,
+						body:messageBody,
 						ownership:'message-other',
 						timestamp:new Date().getTime(),
 			
 					}
-					XMPP.AddMessageToHistory(newMessageObject);
+					XMPP.HandleMessageObject(newMessageObject);
 
-					if (XMPP.OnStopWriting !=null) { XMPP.OnStopWriting(from); }
+					if (XMPP.OnStoppedTyping !=null) { XMPP.OnStoppedTyping(from); }
 				}
-				else if(stanza.childNodes[i].localName=="composing" && XMPP.OnWriting != null)
+				else if(stanza.childNodes[i].localName=="composing" && XMPP.OnStartedTyping != null)
 				{
-					XMPP.OnWriting(from);
+					XMPP.OnStartedTyping(from);
 				}
-				else if(stanza.childNodes[i].localName=="pause" && XMPP.OnStopWriting != null)
+				else if(stanza.childNodes[i].localName=="pause" && XMPP.OnStoppedTyping != null)
 				{
-					XMPP.OnStopWriting(from);
+					XMPP.OnStoppedTyping(from);
 				}
 			}
 		}
@@ -328,8 +335,7 @@ XMPP =
 
 	OnMessageCarbonReceived(carbon)
 	{
-		debug.log("Carbon");
-		debug.log(carbon);
+		alert("Carbon");
 		newMessageObject={};
 		if (carbon.direction=='sent')
 		{
@@ -352,7 +358,7 @@ XMPP =
 		newMessageObject.type=carbon.type;
 		newMessageObject.body=carbon.innerMessage;
 		newMessageObject.timestamp=new Date().getTime();
-		XMPP.AddMessageToHistory(newMessageObject);
+		XMPP.HandleMessageObject(newMessageObject);
 	},
 
 
@@ -520,86 +526,127 @@ XMPP =
 //		HTTP UPLOAD
 //================================================== 
 
-    RequestServices: function(){
+	RequestServices: function()
+	{
 		var server = XMPP.ownJID.split("@")[1];
+		//  var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("query", {"xmlns":"http://jabber.org/protocol/disco#items"});
 		var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("query", {"xmlns":"http://jabber.org/protocol/disco#info"});
 		XMPP.conn.sendIQ(req,
-			function(iq){
+			function(iq)
+			{
 
 				// Searching for upload-service
+				console.log(iq);
 				var identities = iq.getElementsByTagName("identity");
-				for(i=0; i<identities.length; i++){
+				for(i=0; i<identities.length; i++)
+				{
 					if(identities[i].getAttribute("type") == "file")
-						XMPP.uploadService = true;
+						XMPP.httpUploadEnabled = true;
 					if(identities[i].getAttribute("category") == "pubsub")
 						XMPP.pubsubServer = "pubsub." + XMPP.ownDomain;
 				}
-				if(!XMPP.uploadService)
+				var features = iq.getElementsByTagName("feature");
+				for (i=0; i<features.length; i++)
+				{
+					if (features[i].getAttribute("var")=="urn:xmpp:http:upload")
+						XMPP.httpUploadEnabled = true;
+					
+				}
+				if(!XMPP.httpUploadEnabled)
 					console.warn("No HTTP_Upload found on server!");
 				if(!XMPP.pubsubServer)
 					console.warn("No pubsub found on server!");		
 
 			},
-			function(iq){
+			function(iq)
+			{
 				console.warn("Requesting services but server gives an Error:");
 				console.log(iq);
 			});
 		return true;
-    },
-
-    RequestUploadSlot: function(filename,size,type,callback){
-		var server = XMPP.ownJID.split("@")[1];
-		var uploadServer = "upload." + server;
-		var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("request", {"xmlns":"urn:xmpp:http:upload","filename":filename,"size":size,"content-type":type});
-		req.c("filename").t(filename); //Prosody needs this as children and not as attributes :-(
-		req.up().c("size").t(size);
-		req.up().c("content-type").t(type);
-		XMPP.conn.sendIQ(req,function(iq){
-				callback(iq.getElementsByTagName("get")[0].innerHTML,iq.getElementsByTagName("put")[0].innerHTML);
-			},
-			function(iq){
-				console.warn("Failure!");
-			});
-		return true;
-    },
-
-    /*RequestAllUploadServices: function(){  // Maybe for other servers we need other requests, at this moment http_upload only works with prosody!
-		var server = XMPP.ownJID.split("@")[1];
-		var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("query", {"xmlns":"http://jabber.org/protocol/disco#items"});
-		XMPP.conn.sendIQ(req,function(iq){console.log(iq);},function(iq){console.log(iq);});
-		return true;
-    },*/
-
-    UploadFile: function(file,callbackGet,callbackReady){	// Rob, this is the function, we have to fill, to make file-upload working! :-D
-		if(!XMPP.uploadService) return false;
-		XMPP.RequestUploadSlot(file.name,file.size,file.type,function(get,put){
-		callbackGet(get);
-
-		/* We need to send a http-PUT-request with the file to the server, at this moment I have no solution for this. The ajax-Request doesnt work :-( */
-		    /*$.ajax({
-		        type: 'GET',
-			    url: get,
-		        crossDomain: true,
-				data: file,
-		        dataType: 'json',
-				contentType: file.type,
-		        success: function(responseData, textStatus, jqXHR) 
-		        {
-		            callbackReady();
-		        },
-		        error: function (responseData, textStatus, errorThrown) 
-		        {
-		            console.warn("ERROR!");
-		        }
-		    });*/
-
+	},
+	
+	RequestUploadSlot: function(filename,size,type,callback)
+	{
+	    	var server = XMPP.ownJID.split("@")[1];
+	    	var uploadServer = "upload." + server;
+	    	var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("request", {"xmlns":"urn:xmpp:http:upload","filename":filename,"size":size,"content-type":type});
+	    	req.c("filename").t(filename); //Prosody needs this as children and not as attributes :-(
+	    	req.up().c("size").t(size);
+	    	req.up().c("content-type").t(type);
+	    	XMPP.conn.sendIQ(req,function(iq)	// if successful
+		{
+			callback(iq.getElementsByTagName("get")[0].innerHTML,iq.getElementsByTagName("put")[0].innerHTML);
+		},
+		function(iq)				// else
+		{
+			callback(false);
+			console.warn("Could not request upload slot");
 		});
-		return true;
-    },
+	return true;
+	},
+	
+	/*RequestAllUploadServices: function(){  // Maybe for other servers we need other requests, at this moment http_upload only works with prosody!
+	    	var server = XMPP.ownJID.split("@")[1];
+	    	var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("query", {"xmlns":"http://jabber.org/protocol/disco#items"});
+	    	XMPP.conn.sendIQ(req,function(iq){console.log(iq);},function(iq){console.log(iq);});
+	    	return true;
+	},*/
+	
+	UploadFile: function(file,progressCallback)
+	{
+	    	if(!XMPP.httpUploadEnabled) return false;
+	    	XMPP.RequestUploadSlot(file.name,file.size,file.type,function(get,put)
+		{
+			http= new XMLHttpRequest();
+			http.file=file;
+			http.addEventListener('progress', function(progressObject)
+			{
+				if (progressCallback!=null)
+				{
+					var progress=progressObject.position || progressObject.loaded;
+					var total=progressObject.totalSize || progressObject.total;
+					progressCallback(progress/total);
+				}
+			}
+			http.onreadystatechange = function()
+			{
+				if (http.readyState==4)
+				{
+					console.log(http.responseText);
+				}
+			}
+			form= new FormData();
+			form.append("file",file);
+			http.open('post', put, true);
+			http.send(form);
+			// callbackGet(get);		// what's whith this ....
+		
+			/* We need to send a http-PUT-request with the file to the server, at this moment I have no solution for this. The ajax-Request doesnt work :-( */
+			    /*$.ajax({
+				type: 'GET',
+				    url: get,
+				crossDomain: true,
+					data: file,
+				dataType: 'json',
+					contentType: file.type,
+				success: function(responseData, textStatus, jqXHR) 
+				{
+				    callbackReady();
+				},
+				error: function (responseData, textStatus, errorThrown) 
+				{
+				    console.warn("ERROR!");
+				}
+			    });*/
+	
+	    	});
+	    	return true;
+	},
     
 
 //================================================== 
-//  			Pubsubs	
+//  			PUBSUBS	
 //================================================== 
     
     CreateNode: function(nodeName,callback){
