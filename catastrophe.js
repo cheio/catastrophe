@@ -10,6 +10,7 @@ XMPP =
 	ownDomain: null,
 	ownVCard: {},
 	roster: {},
+	groups: {},
 	httpUploadEnabled: false,
 	pubsubServer: false,
 
@@ -172,12 +173,17 @@ XMPP =
 		XMPP.conn.addHandler(XMPP.OnSubscriptionRequest, null, "presence", "subscribe");
 		XMPP.conn.addHandler(XMPP.OnMessageStanza,null, "message");
 		XMPP.conn.send($pres().tree());
-		XMPP.RequestServices();
-		XMPP.RequestVCard(XMPP.ownJID,function(vcard) { XMPP.ownVCard = vcard });
-		XMPP.ownDomain = XMPP.conn.domain;
-
 		XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);
-		if (XMPP.OnCustomConnected!=null) {  XMPP.OnCustomConnected(); }
+		XMPP.ownDomain = XMPP.conn.domain;
+		XMPP.RequestServices(function(){
+			XMPP.RequestVCard(XMPP.ownJID,function(vcard) { 
+				XMPP.ownVCard = vcard; 
+				XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions){
+					XMPP.groups = subscriptions;
+					if (XMPP.OnCustomConnected!=null) {  XMPP.OnCustomConnected(); }
+					});
+				});
+		});
 		return true;
 	},
 
@@ -335,7 +341,7 @@ XMPP =
 
 	OnMessageCarbonReceived(carbon)
 	{
-		alert("Carbon");
+		console.info(carbon);
 		newMessageObject={};
 		if (carbon.direction=='sent')
 		{
@@ -526,7 +532,7 @@ XMPP =
 //		HTTP UPLOAD
 //================================================== 
 
-	RequestServices: function()
+	RequestServices: function(callback)
 	{
 		var server = XMPP.ownJID.split("@")[1];
 		//  var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("query", {"xmlns":"http://jabber.org/protocol/disco#items"});
@@ -536,7 +542,6 @@ XMPP =
 			{
 
 				// Searching for upload-service
-				console.log(iq);
 				var identities = iq.getElementsByTagName("identity");
 				for(i=0; i<identities.length; i++)
 				{
@@ -556,7 +561,7 @@ XMPP =
 					console.warn("No HTTP_Upload found on server!");
 				if(!XMPP.pubsubServer)
 					console.warn("No pubsub found on server!");		
-
+				callback(true);
 			},
 			function(iq)
 			{
@@ -608,7 +613,7 @@ XMPP =
 					var total=progressObject.totalSize || progressObject.total;
 					progressCallback(progress/total);
 				}
-			}
+			});
 			http.onreadystatechange = function()
 			{
 				if (http.readyState==4)
@@ -649,10 +654,11 @@ XMPP =
 //  			PUBSUBS	
 //================================================== 
     
-    CreateNode: function(nodeName,callback){
-		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"create1"})
+    CreateNode: function(nodeJID,callback){
+    	nodeJID = nodeJID.split("@");
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":nodeJID[1], "id":"create1"})
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
-		.c("create", {"node":nodeName});
+		.c("create", {"node":nodeJID[0]});
 		XMPP.conn.sendIQ(req,function(iq){
 				console.log("Success!");
 				console.info(iq);
@@ -666,10 +672,11 @@ XMPP =
 		return true;
     },
 
-    DeleteNode: function(nodeName,callback){
-		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"delete1"})
+    DeleteNode: function(nodeJID,callback){
+    	nodeJID = nodeJID.split("@");
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":nodeJID[1], "id":"delete1"})
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub#owner"})
-		.c("delete", {"node":nodeName});
+		.c("delete", {"node":nodeJID[0]});
 		XMPP.conn.sendIQ(req,function(iq){
 				console.log("Success!");
 				console.info(iq);
@@ -683,13 +690,13 @@ XMPP =
 		return true;
     },
 
-    SubscribeNode: function(nodeName,callback){
-		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"sub1"})
+    SubscribeNode: function(nodeJID,callback){
+    	nodeJID = nodeJID.split("@");
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":nodeJID[1], "id":"sub1"})
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
-		.c("subscribe", {"node":nodeName, "jid":XMPP.ownJID});
+		.c("subscribe", {"node":nodeJID[0], "jid":XMPP.ownJID});
 		XMPP.conn.sendIQ(req,function(iq){
-				console.log("Success!");
-				console.info(iq);
+				XMPP.groups[nodeJID[0] + "@" + nodeJID[1]] = "subscribed";
 				callback(true);
 			},
 			function(iq){
@@ -700,13 +707,13 @@ XMPP =
 		return true;
     },
 
-    UnsubscribeNode: function(nodeName,callback){
-		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"unsub1"})
+    UnsubscribeNode: function(nodeJID,callback){
+    	nodeJID = nodeJID.split("@");
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":nodeJID[1], "id":"unsub1"})
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
-		.c("unsubscribe", {"node":nodeName, "jid":XMPP.ownJID});
+		.c("unsubscribe", {"node":nodeJID[0], "jid":XMPP.ownJID});
 		XMPP.conn.sendIQ(req,function(iq){
-				console.log("Success!");
-				console.info(iq);
+				delete XMPP.groups[nodeJID[0] + "@" + nodeJID[1]];
 				callback(true);
 			},
 			function(iq){
@@ -717,8 +724,9 @@ XMPP =
 		return true;
     },
 
-    GetNodeSubscriptions: function(nodeName,callback){
-		var req=$iq({"type":"get", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"subscriptions1"})
+    GetNodeSubscriptions: function(nodeJID,callback){
+    	nodeJID = nodeJID.split("@");
+		var req=$iq({"type":"get", "from": XMPP.ownJID, "to":nodeJID[1], "id":"subscriptions1"})
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
 		.c("subscriptions");
 		XMPP.conn.sendIQ(req,function(iq){
@@ -736,18 +744,17 @@ XMPP =
     },
 
     // Publishes a new item in a node and gives the id of the new item in the callback-function
-    PublishNodeItem: function(nodeName,title,text,callback){
-		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"unsub1"})
+    PublishNodeItem: function(nodeJID,text,callback){
+    	nodeJID = nodeJID.split("@");
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":nodeJID[1], "id":"publish1"})
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
-		.c("publish", {"node":nodeName})
-		.c("item", {"id":hashCode(title + text + (new Date()))})
+		.c("publish", {"node":nodeJID[0]})
+		.c("item", {"id":hashCode(XMPP.ownJID + text + (new Date()))})
 		.c("entry", {"xmlns":"http://www.w3.org/2005/Atom"})
-		.c("title").t(title).up()
+		.c("title").t(XMPP.ownJID).up()
 		.c("summary").t(text).up()
 		.c("published").t(new Date()).up();
 		XMPP.conn.sendIQ(req,function(iq){
-				console.log("Success!");
-				console.info(iq);
 				callback(iq.getElementsById("item")[0].getAttribute("id"));
 			},
 			function(iq){
@@ -758,10 +765,11 @@ XMPP =
 		return true;
     },
 
-    DeleteNodeItem: function(nodeName,itemID,callback){
-		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"retract1"})
+    DeleteNodeItem: function(nodeJID,itemID,callback){
+    	nodeJID = nodeJID.split("@");
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":nodeJID[1], "id":"retract1"})
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
-		.c("retract", {"node":nodeName})
+		.c("retract", {"node":nodeJID[0]})
 		.c("item", {"id":itemID});
 		XMPP.conn.sendIQ(req,function(iq){
 				console.log("Success!");
@@ -776,10 +784,11 @@ XMPP =
 		return true;
     },
 
-    DeleteAllNodeItems: function(nodeName,callback){
-		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"purge1"})
+    DeleteAllNodeItems: function(nodeJID,callback){
+    	nodeJID = nodeJID.split("@");
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "to":nodeJID[1], "id":"purge1"})
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
-		.c("purge", {"node":nodeName});
+		.c("purge", {"node":nodeJID[0]});
 		XMPP.conn.sendIQ(req,function(iq){
 				console.log("Success!");
 				console.info(iq);
@@ -793,15 +802,22 @@ XMPP =
 		return true;
     },
     
-    GetNodeItems: function(nodeName,callback){
-		var req=$iq({"type":"get", "from": XMPP.ownJID, "to":XMPP.pubsubServer, "id":"items1"})
+    GetNodeItems: function(nodeJID,callback){
+    	var nodeJID = nodeJID.split("@");
+		var req=$iq({"type":"get", "from": XMPP.ownJID, "to":nodeJID[1], "id":"items1"})
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
-		.c("items", {"node":nodeName});
+		.c("items", {"node":nodeJID[0]});
 		XMPP.conn.sendIQ(req,function(iq){
-				console.log("Success!");
-				console.info(iq);
-				var items = iq.getElemensByTagName("item");
-				callback(items);
+				var postings = {};
+				var items = iq.getElementsByTagName("item");
+				for(var i=0; i<items.length; i++){
+					postings[items[i].getAttribute("id")] = {
+						"from": items[i].getElementsByTagName("title")[0].innerHTML,
+						"body": items[i].getElementsByTagName("summary")[0].innerHTML,
+						"timestamp": items[i].getElementsByTagName("published")[0].innerHTML
+					}
+				}
+				callback(postings);
 			},
 			function(iq){
 				console.warn("Failure!");
@@ -810,8 +826,30 @@ XMPP =
 			});
 		return true;
     },
-	
+    
+    GetAllSubscriptions: function(pubsubServer, callback){
+		var req=$iq({"type":"get", "from": XMPP.ownJID, "to":pubsubServer, "id":"subscriptions1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("subscriptions");
+		XMPP.conn.sendIQ(req,function(iq){
+				var subscriptions = {};
+				var items = iq.getElementsByTagName("subscription");
+				for(var i=0; i<items.length; i++) subscriptions[items[i].getAttribute("node") + "@" + pubsubServer] = "subscribed";
+				callback(subscriptions);
+			},
+			function(iq){
+				console.warn("Failure!");
+				console.info(iq);
+				callback(false);
+			});
+		return true;
+    },
+
 }
+
+//================================================== 
+//				TERMINAL INTERFACE	
+//================================================== 
 
 
 function $parsexml (xml)
