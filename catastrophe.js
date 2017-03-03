@@ -2,6 +2,8 @@
 //boshurl='https://daumentempler.de.hm:5281/http-bind/';
 //boshurl='https://openim.de/http-bind/';
 
+const requestTimeout = 5 * 1000;
+
 XMPP = 
 {
 	connectionStatus: 0,
@@ -164,6 +166,17 @@ XMPP =
 
 	OnIqStanza: function(stanza) { console.log(stanza); },
 
+	requestTimeout: null,
+	
+	loginRequests: 0,
+	
+	loginRequestReadyCheck: function(){
+		XMPP.loginRequests++;
+		if (XMPP.loginRequests >= 3 && XMPP.OnCustomConnected!=null) {
+			clearTimeout(XMPP.requestTimeout);
+			XMPP.OnCustomConnected();
+			}
+	},
 
 	OnConnected: function()
 	{	
@@ -175,19 +188,32 @@ XMPP =
 		XMPP.conn.send($pres().tree());
 		XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);
 		XMPP.ownDomain = XMPP.conn.domain;
+		if (XMPP.OnCustomConnected!=null) {
+			XMPP.requestTimeout = setTimeout(function(){XMPP.loginRequests = -10; XMPP.OnCustomConnected();},requestTimeout);
+			}
+		XMPP.loginRequests = 0;
+		
 		XMPP.RequestServices(function()
-			{
-				XMPP.RequestVCard(XMPP.ownJID,function(vcard) 
-					{ 
-						console.log("habib");
-						XMPP.ownVCard = vcard; 
-					});
-				XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions)
+		{
+			XMPP.loginRequestReadyCheck();
+			XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions)
 					{
 						XMPP.groups = subscriptions;
+						XMPP.loginRequestReadyCheck();
+					},function()
+					{
+						console.warn("No answer from " + XMPP.pubsubServer);
+						XMPP.loginRequestReadyCheck();
 					});
-			});
-		if (XMPP.OnCustomConnected!=null) {  XMPP.OnCustomConnected(); }
+		});
+		XMPP.RequestVCard(XMPP.ownJID,function(vcard) 
+		{
+			XMPP.ownVCard = vcard;
+			XMPP.loginRequestReadyCheck();
+		});
+		if(!XMPP.pubsubServer)
+		{	
+		}
 		return true;
 	},
 
@@ -211,12 +237,18 @@ XMPP =
 //================================================== 
 //			ROSTER
 //================================================== 
-
+	
+	vcardCounter: 0,
+	
+	countRoster: 0,
+	
 	RefreshRoster: function(OnRosterUpdated)
 	{
 		XMPP.conn.roster.get(function()
 		{
 			XMPP.roster={};
+			XMPP.countRoster = XMPP.conn.roster.items.length;
+			
 			for (contact in XMPP.conn.roster.items)
 			{
 				var currentContact=XMPP.conn.roster.items[contact];
@@ -225,9 +257,26 @@ XMPP =
 				currentContact.screenName=currentContact.jid.match(/^[^@]*/)[0];
 				currentContact.temporary=false;
 				XMPP.roster[currentContact.jid]=currentContact;
-				XMPP.RequestVCard(currentContact.jid,function(vcard,jid){ XMPP.roster[jid].vcard = vcard; });
+				XMPP.vcardCounter = 0;
+				XMPP.RequestVCard(currentContact.jid,function(vcard,jid){
+					XMPP.roster[jid].vcard = vcard;
+					XMPP.vcardCounter++;	console.count(XMPP.vcardCounter);
+					if(XMPP.vcardCounter >= XMPP.countRoster){
+						clearTimeout(XMPP.requestTimeout);
+						OnRosterUpdated(XMPP.roster);
+					}
+				},function(){
+					XMPP.vcardCounter++;
+					if(XMPP.vcardCounter >= XMPP.countRoster){
+						clearTimeout(XMPP.requestTimeout);
+						OnRosterUpdated(XMPP.roster);
+					}
+				});
 			}
-			OnRosterUpdated(XMPP.roster);
+			if(XMPP.countRoster > 0)
+				XMPP.requestTimeout = setTimeout(function(){XMPP.vcardCounter = -10; OnRosterUpdated(XMPP.roster);},requestTimeout);
+			else
+				OnRosterUpdated(XMPP.roster);
 		});
 	},
 
@@ -266,8 +315,7 @@ XMPP =
 	},
 
 	OnMessageStanza: function(stanza)
-	{	
-		//console.log(stanza);
+	{	//console.log(stanza);
 		if (stanza.attributes.type.value=="chat")
 		{
 			for (i=0; i<stanza.childNodes.length; i++)
@@ -346,33 +394,52 @@ XMPP =
 
 	OnMessageCarbonReceived(carbon)
 	{
+		// Check if carbon is a message
 		console.info(carbon);
-		newMessageObject={};
-		if (carbon.direction=='sent')
-		{
-			newMessageObject=
+		if(carbon.type != undefined){
+			newMessageObject={};
+			if (carbon.direction=='sent')
 			{
-				from:XMPP.ownJID,
-				to:carbon.to,
-				ownership:'message-own',
+				newMessageObject=
+				{
+					from:XMPP.ownJID,
+					to:carbon.to,
+					ownership:'message-own',
+				}
 			}
-		}
-		else
-		{
-			newMessageObject=
+			else
 			{
-				from:carbon.to,
-				to:XMPP.ownJID,
-				ownership:'message-other',
+				newMessageObject=
+				{
+					from:carbon.to,
+					to:XMPP.ownJID,
+					ownership:'message-other',
+				}
 			}
+			newMessageObject.type=carbon.type;
+			newMessageObject.body=carbon.innerMessage;
+			newMessageObject.timestamp=new Date().getTime();
+			XMPP.HandleMessageObject(newMessageObject);
 		}
-		newMessageObject.type=carbon.type;
-		newMessageObject.body=carbon.innerMessage;
-		newMessageObject.timestamp=new Date().getTime();
-		XMPP.HandleMessageObject(newMessageObject);
+		else if(carbon.direction=='received')
+		{
+			var message = carbon.innerMessage.prevObject[0];
+			if(XMPP.OnSubscriptionMessage != null && message.getElementsByTagName("event")[0].getAttribute("xmlns") == "http://jabber.org/protocol/pubsub#event")
+			{
+				var nodeName = message.getElementsByTagName("items")[0].getAttribute("node");
+				var pubsubServer = message.getAttribute("from");
+				var nodeItem = message.getElementsByTagName("item")[0];
+				XMPP.OnSubscriptionMessage(
+						nodeName + "@" + pubsubServer,
+						nodeItem.getAttribute("id"),
+						nodeItem.getElementsByTagName("title")[0].innerHTML,
+						nodeItem.getElementsByTagName("summary")[0].innerHTML,
+						nodeItem.getElementsByTagName("published")[0].innerHTML
+						);
+			}
+				
+		}
 	},
-
-
 
 	OnSubRequest: null,
 
@@ -552,7 +619,6 @@ XMPP =
 			{
 
 				// Searching for upload-service
-				console.log(iq);
 				var identities = iq.getElementsByTagName("identity");
 				for(i=0; i<identities.length; i++)
 				{
@@ -566,6 +632,8 @@ XMPP =
 				{
 					if (features[i].getAttribute("var")=="urn:xmpp:http:upload")
 						XMPP.httpUploadEnabled = true;
+					if(XMPP.pubsubServer != null && features[i].getAttribute("var") == "http://jabber.org/protocol/pubsub#publish")
+						XMPP.pubsubServer = "pubsub." + XMPP.ownDomain;
 					
 				}
 				if(!XMPP.httpUploadEnabled)
@@ -818,15 +886,18 @@ XMPP =
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
 		.c("items", {"node":nodeJID[0]});
 		XMPP.conn.sendIQ(req,function(iq){
-				var postings = {};
+				var postings = new Array;
 				var items = iq.getElementsByTagName("item");
 				for(var i=0; i<items.length; i++){
-					postings[items[i].getAttribute("id")] = {
+					postings.push({
+						"id": items[i].getAttribute("id"),
 						"from": items[i].getElementsByTagName("title")[0].innerHTML,
 						"body": items[i].getElementsByTagName("summary")[0].innerHTML,
-						"timestamp": items[i].getElementsByTagName("published")[0].innerHTML
-					}
+						"timestamp": (new Date(items[i].getElementsByTagName("published")[0].innerHTML)).getTime()
+					});
 				}
+				postings.sort(function(a, b) {
+	                return b.timestamp - a.timestamp;   });
 				callback(postings);
 			},
 			function(iq){
@@ -856,12 +927,10 @@ XMPP =
 			});
 		return true;
     },
+    
+    OnSubscriptionMessage: null,
 
 }
-
-//================================================== 
-//				TERMINAL INTERFACE	
-//================================================== 
 
 
 function $parsexml (xml)
