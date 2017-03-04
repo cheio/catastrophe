@@ -1,9 +1,4 @@
 const requestTimeout = 5 * 1000;
-
-const requestTimeout = 8 * 1000;
-
-const requestTimeout = 5 * 1000;
-
 XMPP = 
 {
 	connectionStatus: 0,
@@ -31,7 +26,7 @@ XMPP =
 //			MUC
 //================================================== 
 
-	mucs:{},
+	mucs: {},
 	RoomClient: function(roomJid, nickname, NewMessageNotifyFunction)
 	{
 		this.messages=[];
@@ -52,7 +47,8 @@ XMPP =
 				if(stanza.getElementsByTagName("delay").length != 0) time = new Date(stanza.getElementsByTagName("delay")[0].attributes.stamp.value);
 				else time = new Date();
 				sentByNick=stanza.attributes.from.value.match(/[^\/]*$/)[0];
-				newMessage={
+				newMessage=
+				{
 					from:stanza.attributes.from.value,
 					fromNick:sentByNick,
 					type:stanza.attributes.type.value,
@@ -80,7 +76,8 @@ XMPP =
 
 		this.refreshOccupants = function(callback)
 		{
-			XMPP.conn.muc.queryOccupants(roomJid,function(stanza){
+			XMPP.conn.muc.queryOccupants(roomJid,function(stanza)
+			{
 				var occupantsArray = [];
 				var itemArray = stanza.getElementsByTagName("item");
 				for(i=0;i<itemArray.length;i++) occupantsArray.push("" + itemArray[i].getAttribute("name"));
@@ -148,17 +145,17 @@ XMPP =
 
 	OnConnectionStatus: function(nStatus)
 	{
-		console.log(nStatus);
+		var statusStrings={ 0:"Error", 1:"Connecting", 2:"Connection failed", 3:"Authenticating", 4:"Authentication failed", 5:"Connected", 6:"Disconnected", 7:"Disconnecting", 8:"Attached" }
+		console.log(statusStrings[nStatus]+ " ("+nStatus+")");
 		switch(nStatus)
 		{
-			case Strophe.Status.CONNECTING: console.log("Connecting"); break;
-			case Strophe.Status.DISCONNECTING: if (XMPP.OnDisconnect != null) XMPP.OnDisconnect(); break;
-			case Strophe.Status.CONNECTED: console.log("Connected"); XMPP.OnConnected(); break;
-			case Strophe.Status.CONNFAIL: console.log("No Connection"); break;
-
+			case Strophe.Status.CONNECTING: break;
+			case Strophe.Status.DISCONNECTING: break;
+			case Strophe.Status.DISCONNECTED: if (XMPP.OnDisconnect != null) XMPP.OnDisconnect(); break;
+			case Strophe.Status.CONNECTED: if (XMPP.OnCustomConnected) XMPP.OnCustomConnected(); break;
+			case Strophe.Status.CONNFAIL: break;
 			case Strophe.Status.AUTHFAIL: if (XMPP.OnError!=null) XMPP.OnError("authentication"); break;
-			default: XMPP.OnWarning("???");break;
-
+			default: XMPP.OnWarning("Unknown Status occured");break;
 		}
 		XMPP.connectionStatus=nStatus;
 		return true;
@@ -170,12 +167,14 @@ XMPP =
 	
 	loginRequests: 0,
 	
-	loginRequestReadyCheck: function(){
+	loginRequestReadyCheck: function()
+	{
 		XMPP.loginRequests++;
-		if (XMPP.loginRequests >= 3 && XMPP.OnCustomConnected!=null) {
+		if (XMPP.loginRequests >= 3 && XMPP.OnCustomConnected!=null)
+		{
 			clearTimeout(XMPP.requestTimeout);
 			XMPP.OnCustomConnected();
-			}
+		}
 	},
 
 	OnConnected: function()
@@ -188,24 +187,28 @@ XMPP =
 		XMPP.conn.send($pres().tree());
 		XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);
 		XMPP.ownDomain = XMPP.conn.domain;
-		if (XMPP.OnCustomConnected!=null) {
+		if (XMPP.OnCustomConnected!=null)
+		{
 			XMPP.requestTimeout = setTimeout(function(){XMPP.loginRequests = -10; XMPP.OnCustomConnected();},requestTimeout);
-			}
+		}
 		XMPP.loginRequests = 0;
 		
 		XMPP.RequestServices(function()
 		{
 			XMPP.loginRequestReadyCheck();
 
-			XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions)
-					{
-						XMPP.groups = subscriptions;
-						XMPP.loginRequestReadyCheck();
-					},function()
-					{
-						console.warn("No answer from " + XMPP.pubsubServer);
-						XMPP.loginRequestReadyCheck();
-					});
+			XMPP.GetAllSubscriptions(XMPP.pubsubServer,
+				function(subscriptions)
+				{
+					XMPP.groups = subscriptions;
+					XMPP.loginRequestReadyCheck();
+				},
+				function()
+				{
+					console.warn("No answer from " + XMPP.pubsubServer);
+					XMPP.loginRequestReadyCheck();
+				}
+			);
 
 		});
 		XMPP.RequestVCard(XMPP.ownJID,function(vcard) 
@@ -669,11 +672,11 @@ XMPP =
 	{
 	    	var server = XMPP.ownJID.split("@")[1];
 	    	var uploadServer = "upload." + server;
-	    	var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("request", {"xmlns":"urn:xmpp:http:upload","filename":filename,"size":size,"content-type":type});
-	    	req.c("filename").t(filename); //Prosody needs this as children and not as attributes :-(
-	    	req.up().c("size").t(size);
-	    	req.up().c("content-type").t(type);
-	    	XMPP.conn.sendIQ(req,
+	    	var request=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("request", {"xmlns":"urn:xmpp:http:upload","filename":filename,"size":size,"content-type":type});
+	    	request.c("filename").t(filename); //Prosody needs this as children and not as attributes :-(
+	    	request.up().c("size").t(size);
+	    	request.up().c("content-type").t(type);
+	    	XMPP.conn.sendIQ(request,
 			function(iq)	// if successful
 			{
 				callback(iq.getElementsByTagName("get")[0].innerHTML,iq.getElementsByTagName("put")[0].innerHTML);
@@ -696,48 +699,38 @@ XMPP =
 	UploadFile: function(file,progressCallback)
 	{
 	    	if(!XMPP.httpUploadEnabled) return false;
-	    	XMPP.RequestUploadSlot(file.name,file.size,file.type,function(get,put)
-		{
-			http= new XMLHttpRequest();
-			http.file=file;
-			http.addEventListener('progress', function(progressObject)
+	    	XMPP.RequestUploadSlot(file.name,file.size,file.type,
+			function(get,put)
 			{
-				if (progressCallback!=null)
-				{
-					var progress=progressObject.position || progressObject.loaded;
-					var total=progressObject.totalSize || progressObject.total;
-					progressCallback(progress/total);
-				}
-			});
-			http.addEventListener('load', function()
-			{
-					// console.log(http.responseText);
-			});
-			form= new FormData();
-			form.append("file",file);
-			http.open('post', put, true);
-			http.send(form);
-			// callbackGet(get);		// what's whith this ....
+				console.log(get);
+				console.log(put);
+				http= new XMLHttpRequest();
+				http.file=file;
+				http.addEventListener('progress',
+					function(progressObject)
+					{
+						if (progressCallback!=null)
+						{
+							var progress=progressObject.position || progressObject.loaded;
+							var total=progressObject.totalSize || progressObject.total;
+							progressCallback(progress/total);
+						}
+					}
+				);
+				http.addEventListener('load',
+					function()
+					{
+							// console.log(http.responseText);
+					}
+				);
+				form= new FormData();
+				form.append("file",file);
+				http.open('post', put, true);
+				http.send(form);
+				console.log("gesenden");
 		
-			/* We need to send a http-PUT-request with the file to the server, at this moment I have no solution for this. The ajax-Request doesnt work :-( */
-			    /*$.ajax({
-				type: 'GET',
-				    url: get,
-				crossDomain: true,
-					data: file,
-				dataType: 'json',
-					contentType: file.type,
-				success: function(responseData, textStatus, jqXHR) 
-				{
-				    callbackReady();
-				},
-				error: function (responseData, textStatus, errorThrown) 
-				{
-				    console.warn("ERROR!");
-				}
-			    });*/
-	
-	    	});
+			}
+		);
 	    	return true;
 	},
     
