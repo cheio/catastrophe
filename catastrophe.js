@@ -1,6 +1,4 @@
-//boshurl='https://conversejs.org/http-bind/';
-//boshurl='https://daumentempler.de.hm:5281/http-bind/';
-//boshurl='https://openim.de/http-bind/';
+const requestTimeout = 5 * 1000;
 
 const requestTimeout = 8 * 1000;
 
@@ -196,6 +194,17 @@ XMPP =
 		XMPP.RequestServices(function()
 		{
 			XMPP.loginRequestReadyCheck();
+
+			XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions)
+					{
+						XMPP.groups = subscriptions;
+						XMPP.loginRequestReadyCheck();
+					},function()
+					{
+						console.warn("No answer from " + XMPP.pubsubServer);
+						XMPP.loginRequestReadyCheck();
+					});
+
 		});
 		XMPP.RequestVCard(XMPP.ownJID,function(vcard) 
 		{
@@ -204,15 +213,7 @@ XMPP =
 		});
 		if(!XMPP.pubsubServer)
 		{	
-		XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions)
-				{
-					XMPP.groups = subscriptions;
-					XMPP.loginRequestReadyCheck();
-				},function()
-				{
-					console.warn("No answer from " + XMPP.pubsubServer);
-					XMPP.loginRequestReadyCheck();
-				});
+
 		}
 		return true;
 	},
@@ -240,12 +241,18 @@ XMPP =
 	
 	vcardCounter: 0,
 
+	
+	countRoster: 0,
+	
+
 	RefreshRoster: function(OnRosterUpdated)
 	{
 		XMPP.conn.roster.get(function()
 		{
 			XMPP.roster={};
-			var countRoster = XMPP.conn.roster.items.length;	console.log(countRoster);
+
+			XMPP.countRoster = XMPP.conn.roster.items.length;
+
 			for (contact in XMPP.conn.roster.items)
 			{
 				var currentContact=XMPP.conn.roster.items[contact];
@@ -255,17 +262,21 @@ XMPP =
 				currentContact.temporary=false;
 				XMPP.roster[currentContact.jid]=currentContact;
 				XMPP.vcardCounter = 0;
-				XMPP.requestTimeout = setTimeout(function(){OnRosterUpdated(XMPP.roster);},requestTimeout);
+
+				XMPP.requestTimeout = setTimeout(function(){XMPP.vcardCounter = -10; OnRosterUpdated(XMPP.roster);},requestTimeout);
 				XMPP.RequestVCard(currentContact.jid,function(vcard,jid){
 					XMPP.roster[jid].vcard = vcard;
 					XMPP.vcardCounter++;
-					if(vcardCounter >= countRoster){
+					if(XMPP.vcardCounter >= XMPP.countRoster){
+
 						clearTimeout(XMPP.requestTimeout);
 						OnRosterUpdated(XMPP.roster);
 					}
 				},function(){
 					XMPP.vcardCounter++;
-					if(vcardCounter >= countRoster){
+
+					if(XMPP.vcardCounter >= XMPP.countRoster){
+
 						clearTimeout(XMPP.requestTimeout);
 						OnRosterUpdated(XMPP.roster);
 					}
@@ -310,8 +321,7 @@ XMPP =
 	},
 
 	OnMessageStanza: function(stanza)
-	{	
-		//console.log(stanza);
+	{	//console.log(stanza);
 		if (stanza.attributes.type.value=="chat")
 		{
 			for (i=0; i<stanza.childNodes.length; i++)
@@ -391,6 +401,9 @@ XMPP =
 	OnMessageCarbonReceived(carbon)
 	{
 		// Check if carbon is a message
+
+		console.info(carbon);
+
 		if(carbon.type != undefined){
 			newMessageObject={};
 			if (carbon.direction=='sent')
@@ -614,7 +627,6 @@ XMPP =
 			{
 
 				// Searching for upload-service
-				console.log(iq);
 				var identities = iq.getElementsByTagName("identity");
 				for(i=0; i<identities.length; i++)
 				{
@@ -628,6 +640,8 @@ XMPP =
 				{
 					if (features[i].getAttribute("var")=="urn:xmpp:http:upload")
 						XMPP.httpUploadEnabled = true;
+					if(XMPP.pubsubServer != null && features[i].getAttribute("var") == "http://jabber.org/protocol/pubsub#publish")
+						XMPP.pubsubServer = "pubsub." + XMPP.ownDomain;
 					
 				}
 				if(!XMPP.httpUploadEnabled)
@@ -890,7 +904,7 @@ XMPP =
 						"timestamp": (new Date(items[i].getElementsByTagName("published")[0].innerHTML)).getTime()
 					});
 				}
-				console.info(postings);
+
 				postings.sort(function(a, b) {
 	                return b.timestamp - a.timestamp;   });
 				callback(postings);
@@ -926,10 +940,6 @@ XMPP =
     OnSubscriptionMessage: null,
 
 }
-
-//================================================== 
-//				TERMINAL INTERFACE	
-//================================================== 
 
 
 function $parsexml (xml)
