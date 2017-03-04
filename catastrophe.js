@@ -1,6 +1,6 @@
-//boshurl='https://conversejs.org/http-bind/';
-//boshurl='https://daumentempler.de.hm:5281/http-bind/';
-//boshurl='https://openim.de/http-bind/';
+const requestTimeout = 5 * 1000;
+
+const requestTimeout = 8 * 1000;
 
 const requestTimeout = 5 * 1000;
 
@@ -196,6 +196,7 @@ XMPP =
 		XMPP.RequestServices(function()
 		{
 			XMPP.loginRequestReadyCheck();
+
 			XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions)
 					{
 						XMPP.groups = subscriptions;
@@ -205,6 +206,7 @@ XMPP =
 						console.warn("No answer from " + XMPP.pubsubServer);
 						XMPP.loginRequestReadyCheck();
 					});
+
 		});
 		XMPP.RequestVCard(XMPP.ownJID,function(vcard) 
 		{
@@ -213,6 +215,7 @@ XMPP =
 		});
 		if(!XMPP.pubsubServer)
 		{	
+
 		}
 		return true;
 	},
@@ -239,16 +242,19 @@ XMPP =
 //================================================== 
 	
 	vcardCounter: 0,
+
 	
 	countRoster: 0,
 	
+
 	RefreshRoster: function(OnRosterUpdated)
 	{
 		XMPP.conn.roster.get(function()
 		{
 			XMPP.roster={};
+
 			XMPP.countRoster = XMPP.conn.roster.items.length;
-			
+
 			for (contact in XMPP.conn.roster.items)
 			{
 				var currentContact=XMPP.conn.roster.items[contact];
@@ -258,25 +264,31 @@ XMPP =
 				currentContact.temporary=false;
 				XMPP.roster[currentContact.jid]=currentContact;
 				XMPP.vcardCounter = 0;
+
 				XMPP.RequestVCard(currentContact.jid,function(vcard,jid){
 					XMPP.roster[jid].vcard = vcard;
 					XMPP.vcardCounter++;	console.count(XMPP.vcardCounter);
 					if(XMPP.vcardCounter >= XMPP.countRoster){
+
 						clearTimeout(XMPP.requestTimeout);
 						OnRosterUpdated(XMPP.roster);
 					}
 				},function(){
 					XMPP.vcardCounter++;
+
 					if(XMPP.vcardCounter >= XMPP.countRoster){
+
 						clearTimeout(XMPP.requestTimeout);
 						OnRosterUpdated(XMPP.roster);
 					}
 				});
 			}
+
 			if(XMPP.countRoster > 0)
 				XMPP.requestTimeout = setTimeout(function(){XMPP.vcardCounter = -10; OnRosterUpdated(XMPP.roster);},requestTimeout);
 			else
 				OnRosterUpdated(XMPP.roster);
+
 		});
 	},
 
@@ -395,6 +407,7 @@ XMPP =
 	OnMessageCarbonReceived(carbon)
 	{
 		// Check if carbon is a message
+
 		console.info(carbon);
 		if(carbon.type != undefined){
 			newMessageObject={};
@@ -411,6 +424,7 @@ XMPP =
 			{
 				newMessageObject=
 				{
+
 					from:carbon.to,
 					to:XMPP.ownJID,
 					ownership:'message-other',
@@ -896,6 +910,7 @@ XMPP =
 						"timestamp": (new Date(items[i].getElementsByTagName("published")[0].innerHTML)).getTime()
 					});
 				}
+
 				postings.sort(function(a, b) {
 	                return b.timestamp - a.timestamp;   });
 				callback(postings);
