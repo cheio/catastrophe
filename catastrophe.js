@@ -2,6 +2,8 @@ const requestTimeout = 5 * 1000;
 
 const requestTimeout = 8 * 1000;
 
+const requestTimeout = 5 * 1000;
+
 XMPP = 
 {
 	connectionStatus: 0,
@@ -263,10 +265,9 @@ XMPP =
 				XMPP.roster[currentContact.jid]=currentContact;
 				XMPP.vcardCounter = 0;
 
-				XMPP.requestTimeout = setTimeout(function(){XMPP.vcardCounter = -10; OnRosterUpdated(XMPP.roster);},requestTimeout);
 				XMPP.RequestVCard(currentContact.jid,function(vcard,jid){
 					XMPP.roster[jid].vcard = vcard;
-					XMPP.vcardCounter++;
+					XMPP.vcardCounter++;	console.count(XMPP.vcardCounter);
 					if(XMPP.vcardCounter >= XMPP.countRoster){
 
 						clearTimeout(XMPP.requestTimeout);
@@ -282,7 +283,12 @@ XMPP =
 					}
 				});
 			}
-			
+
+			if(XMPP.countRoster > 0)
+				XMPP.requestTimeout = setTimeout(function(){XMPP.vcardCounter = -10; OnRosterUpdated(XMPP.roster);},requestTimeout);
+			else
+				OnRosterUpdated(XMPP.roster);
+
 		});
 	},
 
@@ -403,7 +409,6 @@ XMPP =
 		// Check if carbon is a message
 
 		console.info(carbon);
-
 		if(carbon.type != undefined){
 			newMessageObject={};
 			if (carbon.direction=='sent')
@@ -419,6 +424,7 @@ XMPP =
 			{
 				newMessageObject=
 				{
+
 					from:carbon.to,
 					to:XMPP.ownJID,
 					ownership:'message-other',
