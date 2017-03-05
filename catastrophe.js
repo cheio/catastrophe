@@ -152,7 +152,7 @@ XMPP =
 			case Strophe.Status.CONNECTING: break;
 			case Strophe.Status.DISCONNECTING: break;
 			case Strophe.Status.DISCONNECTED: if (XMPP.OnDisconnect != null) XMPP.OnDisconnect(); break;
-			case Strophe.Status.CONNECTED: if (XMPP.OnCustomConnected) XMPP.OnCustomConnected(); break;
+			case Strophe.Status.CONNECTED: XMPP.OnConnected(); break;
 			case Strophe.Status.CONNFAIL: break;
 			case Strophe.Status.AUTHFAIL: if (XMPP.OnError!=null) XMPP.OnError("authentication"); break;
 			default: XMPP.OnWarning("Unknown Status occured");break;
@@ -634,7 +634,6 @@ XMPP =
 		XMPP.conn.sendIQ(req,
 			function(iq)
 			{
-
 				// Searching for upload-service
 				var identities = iq.getElementsByTagName("identity");
 				for(i=0; i<identities.length; i++)
@@ -704,11 +703,12 @@ XMPP =
 			{
 				console.log(get);
 				console.log(put);
-				http= new XMLHttpRequest();
+				http= new XMLHttpRequest({mozSystem: true});
 				http.file=file;
 				http.addEventListener('progress',
 					function(progressObject)
 					{
+						console.log("...");
 						if (progressCallback!=null)
 						{
 							var progress=progressObject.position || progressObject.loaded;
@@ -725,8 +725,11 @@ XMPP =
 				);
 				form= new FormData();
 				form.append("file",file);
-				http.open('post', put, true);
+				http.open('post', put, true); 
+				http.setRequestHeader('X-PINGOTHER', 'pingpong'); 
+				http.setRequestHeader('Content-Type', 'multipart/form-data');
 				http.send(form);
+
 				console.log("gesenden");
 		
 			}
