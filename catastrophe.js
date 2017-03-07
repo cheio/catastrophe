@@ -1,4 +1,9 @@
+//boshurl='https://conversejs.org/http-bind/';
+//boshurl='https://daumentempler.de.hm:5281/http-bind/';
+//boshurl='https://openim.de/http-bind/';
+
 const requestTimeout = 5 * 1000;
+
 XMPP = 
 {
 	connectionStatus: 0,
@@ -26,7 +31,7 @@ XMPP =
 //			MUC
 //================================================== 
 
-	mucs: {},
+	mucs:{},
 	RoomClient: function(roomJid, nickname, NewMessageNotifyFunction)
 	{
 		this.messages=[];
@@ -47,8 +52,7 @@ XMPP =
 				if(stanza.getElementsByTagName("delay").length != 0) time = new Date(stanza.getElementsByTagName("delay")[0].attributes.stamp.value);
 				else time = new Date();
 				sentByNick=stanza.attributes.from.value.match(/[^\/]*$/)[0];
-				newMessage=
-				{
+				newMessage={
 					from:stanza.attributes.from.value,
 					fromNick:sentByNick,
 					type:stanza.attributes.type.value,
@@ -76,8 +80,7 @@ XMPP =
 
 		this.refreshOccupants = function(callback)
 		{
-			XMPP.conn.muc.queryOccupants(roomJid,function(stanza)
-			{
+			XMPP.conn.muc.queryOccupants(roomJid,function(stanza){
 				var occupantsArray = [];
 				var itemArray = stanza.getElementsByTagName("item");
 				for(i=0;i<itemArray.length;i++) occupantsArray.push("" + itemArray[i].getAttribute("name"));
@@ -145,17 +148,17 @@ XMPP =
 
 	OnConnectionStatus: function(nStatus)
 	{
-		var statusStrings={ 0:"Error", 1:"Connecting", 2:"Connection failed", 3:"Authenticating", 4:"Authentication failed", 5:"Connected", 6:"Disconnected", 7:"Disconnecting", 8:"Attached" }
-		console.log(statusStrings[nStatus]+ " ("+nStatus+")");
+		console.log(nStatus);
 		switch(nStatus)
 		{
-			case Strophe.Status.CONNECTING: break;
-			case Strophe.Status.DISCONNECTING: break;
-			case Strophe.Status.DISCONNECTED: if (XMPP.OnDisconnect != null) XMPP.OnDisconnect(); break;
-			case Strophe.Status.CONNECTED: XMPP.OnConnected(); break;
-			case Strophe.Status.CONNFAIL: break;
+			case Strophe.Status.CONNECTING: console.log("Connecting"); break;
+			case Strophe.Status.DISCONNECTING: if (XMPP.OnDisconnect != null) XMPP.OnDisconnect(); break;
+			case Strophe.Status.CONNECTED: console.log("Connected"); XMPP.OnConnected(); break;
+			case Strophe.Status.CONNFAIL: console.log("No Connection"); break;
+
 			case Strophe.Status.AUTHFAIL: if (XMPP.OnError!=null) XMPP.OnError("authentication"); break;
-			default: XMPP.OnWarning("Unknown Status occured");break;
+			default: XMPP.OnWarning("???");break;
+
 		}
 		XMPP.connectionStatus=nStatus;
 		return true;
@@ -167,14 +170,12 @@ XMPP =
 	
 	loginRequests: 0,
 	
-	loginRequestReadyCheck: function()
-	{
+	loginRequestReadyCheck: function(){
 		XMPP.loginRequests++;
-		if (XMPP.loginRequests >= 3 && XMPP.OnCustomConnected!=null)
-		{
+		if (XMPP.loginRequests >= 3 && XMPP.OnCustomConnected!=null) {
 			clearTimeout(XMPP.requestTimeout);
 			XMPP.OnCustomConnected();
-		}
+			}
 	},
 
 	OnConnected: function()
@@ -187,39 +188,25 @@ XMPP =
 		XMPP.conn.send($pres().tree());
 		XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);
 		XMPP.ownDomain = XMPP.conn.domain;
-		if (XMPP.OnCustomConnected!=null)
-		{
+		if (XMPP.OnCustomConnected!=null) {
 			XMPP.requestTimeout = setTimeout(function(){XMPP.loginRequests = -10; XMPP.OnCustomConnected();},requestTimeout);
-		}
+			}
 		XMPP.loginRequests = 0;
 		
 		XMPP.RequestServices(function()
 		{
 			XMPP.loginRequestReadyCheck();
-
-			XMPP.GetAllSubscriptions(XMPP.pubsubServer,
-				function(subscriptions)
-				{
-					XMPP.groups = subscriptions;
-					XMPP.loginRequestReadyCheck();
-				},
-				function()
-				{
-					console.warn("No answer from " + XMPP.pubsubServer);
-					XMPP.loginRequestReadyCheck();
-				}
-			);
-
+			XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions)
+					{
+						XMPP.groups = subscriptions;
+						XMPP.loginRequestReadyCheck();
+					},function()
+					{
+						console.warn("No answer from " + XMPP.pubsubServer);
+						XMPP.loginRequestReadyCheck();
+					});
 		});
-		XMPP.RequestVCard(XMPP.ownJID,function(vcard) 
-		{
-			XMPP.ownVCard = vcard;
-			XMPP.loginRequestReadyCheck();
-		});
-		if(!XMPP.pubsubServer)
-		{	
-
-		}
+		XMPP.RequestAvatar(XMPP.ownJID,XMPP.loginRequestReadyCheck);
 		return true;
 	},
 
@@ -245,55 +232,79 @@ XMPP =
 //================================================== 
 	
 	vcardCounter: 0,
-
 	
 	countRoster: 0,
 	
-
-	RefreshRoster: function(OnRosterUpdated)
+	RefreshRoster: function(OnRosterUpdated,OnAvatarRecieved)
 	{
 		XMPP.conn.roster.get(function()
 		{
 			XMPP.roster={};
-
 			XMPP.countRoster = XMPP.conn.roster.items.length;
-
+			
 			for (contact in XMPP.conn.roster.items)
 			{
 				var currentContact=XMPP.conn.roster.items[contact];
+				
 				currentContact.OnMessage=null;
 				currentContact.messages=[];
 				currentContact.screenName=currentContact.jid.match(/^[^@]*/)[0];
 				currentContact.temporary=false;
 				XMPP.roster[currentContact.jid]=currentContact;
-				XMPP.vcardCounter = 0;
-
-				XMPP.RequestVCard(currentContact.jid,function(vcard,jid){
-					XMPP.roster[jid].vcard = vcard;
-					XMPP.vcardCounter++;	console.count(XMPP.vcardCounter);
-					if(XMPP.vcardCounter >= XMPP.countRoster){
-
-						clearTimeout(XMPP.requestTimeout);
-						OnRosterUpdated(XMPP.roster);
-					}
-				},function(){
-					XMPP.vcardCounter++;
-
-					if(XMPP.vcardCounter >= XMPP.countRoster){
-
-						clearTimeout(XMPP.requestTimeout);
-						OnRosterUpdated(XMPP.roster);
-					}
-				});
 			}
-
-			if(XMPP.countRoster > 0)
-				XMPP.requestTimeout = setTimeout(function(){XMPP.vcardCounter = -10; OnRosterUpdated(XMPP.roster);},requestTimeout);
-			else
-				OnRosterUpdated(XMPP.roster);
-
+			XMPP.requestCounter = 0;
+			XMPP.RecursiveAvatarRequest(OnAvatarRecieved);
+			OnRosterUpdated(XMPP.roster);
 		});
 	},
+	
+	requestCounter:0,
+	
+	RecursiveAvatarRequest : function(callback=function(){}){
+		var ready = false;
+		var RosterArray = $.map(XMPP.roster, function(value, index) {return [value];});
+		var next = function(){			
+			if(!ready){
+				ready = true;
+				XMPP.RecursiveAvatarRequest(callback);
+			}
+		};
+		if(XMPP.requestCounter >= RosterArray.length) return true;
+		XMPP.requestCounter++;
+		XMPP.RequestAvatar(RosterArray[XMPP.requestCounter-1].jid,function(avatar,jid){callback(jid,avatar); next();});
+		setTimeout(next, 500);
+	},
+	
+	RequestAvatar: function(requestJID,callback){
+		var JID = (' ' + requestJID).slice(1);
+		var req=$iq({"type":"get", "from": XMPP.ownJID, "to": JID, "id":"retrieve1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("items", {"node":"urn:xmpp:avatar:data"})
+		.c("item", {"id":XMPP.GetUniqueID()});
+		XMPP.conn.sendIQ(req,function(iq){
+				var avatarData = "data:image/png;base64," + iq.getElementsByTagName("data")[0].innerHTML;
+				if(requestJID in XMPP.roster)
+					XMPP.roster[requestJID].avatar = avatarData;
+				else if(requestJID == XMPP.ownJID)
+					XMPP.ownAvatar = avatarData;
+				setTimeout(function(){callback(avatarData,requestJID);}, 500);
+			});
+		return true;
+    },
+    
+    SetAvatar: function(avatarSrc,callback){
+		var req=$iq({"type":"set", "from": XMPP.ownJID, "id":"publish1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("publish", {"node":"urn:xmpp:avatar:data"})
+		.c("item", {"id":XMPP.GetUniqueID()})
+		.c("data", {"xmlns":'urn:xmpp:avatar:data'})
+		.t(avatarSrc);	console.info(req.tree());
+		XMPP.conn.sendIQ(req,function(iq){console.info(iq);
+			callback(true);
+		},function(iq){console.warn(iq);
+			callback(false);
+		});
+    },
 
 	AddToRoster: function(jid,message)
 	{
@@ -410,7 +421,6 @@ XMPP =
 	OnMessageCarbonReceived(carbon)
 	{
 		// Check if carbon is a message
-
 		console.info(carbon);
 		if(carbon.type != undefined){
 			newMessageObject={};
@@ -427,7 +437,6 @@ XMPP =
 			{
 				newMessageObject=
 				{
-
 					from:carbon.to,
 					to:XMPP.ownJID,
 					ownership:'message-other',
@@ -634,6 +643,7 @@ XMPP =
 		XMPP.conn.sendIQ(req,
 			function(iq)
 			{
+
 				// Searching for upload-service
 				var identities = iq.getElementsByTagName("identity");
 				for(i=0; i<identities.length; i++)
@@ -671,11 +681,11 @@ XMPP =
 	{
 	    	var server = XMPP.ownJID.split("@")[1];
 	    	var uploadServer = "upload." + server;
-	    	var request=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("request", {"xmlns":"urn:xmpp:http:upload","filename":filename,"size":size,"content-type":type});
-	    	request.c("filename").t(filename); //Prosody needs this as children and not as attributes :-(
-	    	request.up().c("size").t(size);
-	    	request.up().c("content-type").t(type);
-	    	XMPP.conn.sendIQ(request,
+	    	var req=$iq({"type":"get", from: XMPP.ownJID, to:server}).c("request", {"xmlns":"urn:xmpp:http:upload","filename":filename,"size":size,"content-type":type});
+	    	req.c("filename").t(filename); //Prosody needs this as children and not as attributes :-(
+	    	req.up().c("size").t(size);
+	    	req.up().c("content-type").t(type);
+	    	XMPP.conn.sendIQ(req,
 			function(iq)	// if successful
 			{
 				callback(iq.getElementsByTagName("get")[0].innerHTML,iq.getElementsByTagName("put")[0].innerHTML);
@@ -698,42 +708,48 @@ XMPP =
 	UploadFile: function(file,progressCallback)
 	{
 	    	if(!XMPP.httpUploadEnabled) return false;
-	    	XMPP.RequestUploadSlot(file.name,file.size,file.type,
-			function(get,put)
+	    	XMPP.RequestUploadSlot(file.name,file.size,file.type,function(get,put)
+		{
+			http= new XMLHttpRequest();
+			http.file=file;
+			http.addEventListener('progress', function(progressObject)
 			{
-				console.log(get);
-				console.log(put);
-				http= new XMLHttpRequest({mozSystem: true});
-				http.file=file;
-				http.addEventListener('progress',
-					function(progressObject)
-					{
-						console.log("...");
-						if (progressCallback!=null)
-						{
-							var progress=progressObject.position || progressObject.loaded;
-							var total=progressObject.totalSize || progressObject.total;
-							progressCallback(progress/total);
-						}
-					}
-				);
-				http.addEventListener('load',
-					function()
-					{
-							// console.log(http.responseText);
-					}
-				);
-				form= new FormData();
-				form.append("file",file);
-				http.open('post', put, true); 
-				http.setRequestHeader('X-PINGOTHER', 'pingpong'); 
-				http.setRequestHeader('Content-Type', 'multipart/form-data');
-				http.send(form);
-
-				console.log("gesenden");
+				if (progressCallback!=null)
+				{
+					var progress=progressObject.position || progressObject.loaded;
+					var total=progressObject.totalSize || progressObject.total;
+					progressCallback(progress/total);
+				}
+			});
+			http.addEventListener('load', function()
+			{
+					// console.log(http.responseText);
+			});
+			form= new FormData();
+			form.append("file",file);
+			http.open('post', put, true);
+			http.send(form);
+			// callbackGet(get);		// what's whith this ....
 		
-			}
-		);
+			/* We need to send a http-PUT-request with the file to the server, at this moment I have no solution for this. The ajax-Request doesnt work :-( */
+			    /*$.ajax({
+				type: 'GET',
+				    url: get,
+				crossDomain: true,
+					data: file,
+				dataType: 'json',
+					contentType: file.type,
+				success: function(responseData, textStatus, jqXHR) 
+				{
+				    callbackReady();
+				},
+				error: function (responseData, textStatus, errorThrown) 
+				{
+				    console.warn("ERROR!");
+				}
+			    });*/
+	
+	    	});
 	    	return true;
 	},
     
@@ -896,7 +912,7 @@ XMPP =
 		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
 		.c("items", {"node":nodeJID[0]});
 		XMPP.conn.sendIQ(req,function(iq){
-				var postings = new Array;
+				var postings = new Array;console.log(iq);
 				var items = iq.getElementsByTagName("item");
 				for(var i=0; i<items.length; i++){
 					postings.push({
@@ -906,7 +922,6 @@ XMPP =
 						"timestamp": (new Date(items[i].getElementsByTagName("published")[0].innerHTML)).getTime()
 					});
 				}
-
 				postings.sort(function(a, b) {
 	                return b.timestamp - a.timestamp;   });
 				callback(postings);
@@ -933,6 +948,27 @@ XMPP =
 			function(iq)
 			{
 				console.warn("Could not get pubsub subscriptions");
+				console.info(iq);
+				callback(false);
+			});
+		return true;
+    },
+    
+    GetAllFollower: function(nodeJID, callback){
+    	var nodeJID = nodeJID.split("@");
+		var req=$iq({"type":"get", "from": XMPP.ownJID, "to":nodeJID[1], "id":"subman1"})
+		.c("pubsub", {"xmlns":"http://jabber.org/protocol/pubsub"})
+		.c("subscriptions", {"node":nodeJID[0]});
+		XMPP.conn.sendIQ(req,function(iq)
+			{	
+				var follower = new Array;
+				var items = iq.getElementsByTagName("subscription");
+				for(var i=0; i<items.length; i++) follower.push(items[i].getAttribute("jid"));
+				callback(follower);
+			},
+			function(iq)
+			{
+				console.warn("Could not get node follower");
 				console.info(iq);
 				callback(false);
 			});
