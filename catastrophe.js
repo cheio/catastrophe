@@ -171,12 +171,20 @@ XMPP =
 	loginRequests: 0,
 	
 	loginRequestReadyCheck: function(){
-		XMPP.loginRequests++;
-		if (XMPP.loginRequests >= 3 && XMPP.OnCustomConnected!=null) {
+		XMPP.loginRequests++;	console.log(XMPP.loginRequests);
+		if (XMPP.loginRequests >= 2 && XMPP.OnCustomConnected!=null) {
 			clearTimeout(XMPP.requestTimeout);
 			XMPP.OnCustomConnected();
-			}
+			XMPP.loginRequests = -10;
+		}
 	},
+	
+	CallCustomConnect: function(){
+		XMPP.ConReady = true;
+		XMPP.OnCustomConnected();
+	},
+	
+	ConReady: false,
 
 	OnConnected: function()
 	{	
@@ -188,25 +196,24 @@ XMPP =
 		XMPP.conn.send($pres().tree());
 		XMPP.conn.messageCarbons.enable(XMPP.OnMessageCarbonReceived);
 		XMPP.ownDomain = XMPP.conn.domain;
+		XMPP.ConReady = false;
 		if (XMPP.OnCustomConnected!=null) {
-			XMPP.requestTimeout = setTimeout(function(){XMPP.loginRequests = -10; XMPP.OnCustomConnected();},requestTimeout);
+			XMPP.requestTimeout = setTimeout(function(){if(!XMPP.ConReady) XMPP.OnCustomConnected();},requestTimeout);
 			}
 		XMPP.loginRequests = 0;
 		
 		XMPP.RequestServices(function()
 		{
-			XMPP.loginRequestReadyCheck();
-			XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions)
+			XMPP.RequestAvatar(XMPP.ownJID,function(){
+				XMPP.GetAllSubscriptions(XMPP.pubsubServer, function(subscriptions)
 					{
 						XMPP.groups = subscriptions;
-						XMPP.loginRequestReadyCheck();
-					},function()
-					{
-						console.warn("No answer from " + XMPP.pubsubServer);
-						XMPP.loginRequestReadyCheck();
-					});
-		});
-		XMPP.RequestAvatar(XMPP.ownJID,XMPP.loginRequestReadyCheck);
+						XMPP.CallCustomConnect();
+					},XMPP.CallCustomConnect);
+				},XMPP.CallCustomConnect);
+			
+		},XMPP.CallCustomConnect);
+		
 		return true;
 	},
 
@@ -272,7 +279,7 @@ XMPP =
 		if(XMPP.requestCounter >= RosterArray.length) return true;
 		XMPP.requestCounter++;
 		XMPP.RequestAvatar(RosterArray[XMPP.requestCounter-1].jid,function(avatar,jid){callback(jid,avatar); next();});
-		setTimeout(next, 500);
+		setTimeout(next, requestTimeout);
 	},
 	
 	RequestAvatar: function(requestJID,callback){
@@ -283,12 +290,16 @@ XMPP =
 		.c("item", {"id":XMPP.GetUniqueID()});
 		XMPP.conn.sendIQ(req,function(iq){
 				var avatarData = "data:image/png;base64," + iq.getElementsByTagName("data")[0].innerHTML;
-				if(requestJID in XMPP.roster)
-					XMPP.roster[requestJID].avatar = avatarData;
+				var jid = iq.getAttribute("from");
+				if(jid in XMPP.roster)
+					XMPP.roster[jid].avatar = avatarData;
 				else if(requestJID == XMPP.ownJID)
 					XMPP.ownAvatar = avatarData;
-				setTimeout(function(){callback(avatarData,requestJID);}, 500);
-			});
+				callback(avatarData,jid);
+				//setTimeout(function(){callback(avatarData,jid);}, 500);
+			},function(iq){
+			callback(null,requestJID);
+		});
 		return true;
     },
     
